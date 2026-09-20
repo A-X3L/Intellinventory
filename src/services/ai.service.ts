@@ -11,6 +11,15 @@ export interface AiStatusResponse {
   protection: string;
 }
 
+export type AiProfileMode = 'pedagogue' | 'chirurgical';
+
+export interface AskQuestionOptions {
+  prompt: string;
+  inventory: ElectronicComponent[];
+  mode?: AiProfileMode;
+  image?: string;
+}
+
 export interface ScannedComponentData {
   reference: string;
   family: string;
@@ -60,13 +69,36 @@ export const AiService = {
   },
 
   /**
-   * Envoie une question avec le contexte réel des composants d'atelier.
+   * Envoie une question avec le profil sélectionné (Pédagogue ou Chirurgical) et image multimodale optionnelle.
    */
-  async askQuestion(prompt: string, inventory: ElectronicComponent[]): Promise<string> {
+  async askQuestion(
+    optionsOrPrompt: AskQuestionOptions | string, 
+    inventory?: ElectronicComponent[],
+    mode: AiProfileMode = 'pedagogue',
+    image?: string
+  ): Promise<string> {
+    let payload: { prompt: string; inventory: ElectronicComponent[]; mode: AiProfileMode; image?: string };
+
+    if (typeof optionsOrPrompt === 'string') {
+      payload = {
+        prompt: optionsOrPrompt,
+        inventory: inventory || [],
+        mode,
+        image
+      };
+    } else {
+      payload = {
+        prompt: optionsOrPrompt.prompt,
+        inventory: optionsOrPrompt.inventory,
+        mode: optionsOrPrompt.mode || 'pedagogue',
+        image: optionsOrPrompt.image
+      };
+    }
+
     const res = await fetch('/api/ai/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, inventory })
+      body: JSON.stringify(payload)
     });
 
     const data = await res.json();

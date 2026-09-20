@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Save, Layers, MapPin, Hash, Link as LinkIcon, Camera, Trash2, Upload, Printer } from 'lucide-react';
 import { ElectronicComponent, PackageFormat, CATEGORIES_LIST } from '../../core/domain/types';
+import { processAndCompressImage } from '../../utils/image-processor';
 
 interface ComponentModalProps {
   isOpen: boolean;
@@ -65,15 +66,20 @@ export const ComponentModal: React.FC<ComponentModalProps> = ({
     setErrorMsg(null);
   }, [componentToEdit, isOpen]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setFormData((prev) => ({ ...prev, imageUrl: event.target?.result as string }));
-    };
-    reader.readAsDataURL(file);
+    try {
+      const processed = await processAndCompressImage(file);
+      setFormData((prev) => ({ ...prev, imageUrl: processed.dataUrl }));
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setFormData((prev) => ({ ...prev, imageUrl: event.target?.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   if (!isOpen) return null;

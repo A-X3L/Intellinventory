@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { ElectronicComponent, PackageFormat, CATEGORIES_LIST } from '../../core/domain/types';
 import { AiService, ScannedComponentData } from '../../services/ai.service';
+import { processAndCompressImage } from '../../utils/image-processor';
 
 interface ScannerModalProps {
   isOpen: boolean;
@@ -129,19 +130,19 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
     analyzeImageWithGemini(dataUrl);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setErrorMessage(null);
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      setCapturedImage(dataUrl);
-      analyzeImageWithGemini(dataUrl);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const processed = await processAndCompressImage(file);
+      setCapturedImage(processed.dataUrl);
+      analyzeImageWithGemini(processed.dataUrl);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Erreur lors du traitement de l'image.");
+    }
   };
 
   const analyzeImageWithGemini = async (imageDataUrl: string) => {

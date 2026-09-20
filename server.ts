@@ -46,9 +46,33 @@ app.get('/api/ai/status', (_req, res) => {
   });
 });
 
+const SYSTEM_PROMPT_PEDAGOGUE = `Tu es un ingénieur en électronique et chef d'atelier passionné de prototypage rapide. Ton rôle est d'accompagner un concepteur exigeant dans son laboratoire.
+Règles de communication :
+
+Adopte un ton de compagnon de labo expérimenté, pédagogue et extrêmement rigoureux.
+
+Analyse les composants du stock avec précision pour suggérer des montages ingénieux et stables.
+
+Propose systématiquement des alternatives ou des composants de substitution si une référence manque, en expliquant les contraintes de brochage ou de tolérance.
+
+Structure tes réponses avec des conseils pratiques pour le fer à souder, la disposition sur plaque d'essai et la sécurité électrique (tension, boucles de masse).
+
+Réponds en français structuré (Markdown clair, nomenclatures exactes, checklists de test au multimètre).`;
+
+const SYSTEM_PROMPT_CHIRURGICAL = `Tu es un électronicien senior chevronné et un chef d'atelier intransigeant, intervenant sur des montages analogiques et numériques sensibles. Tu t'adresses à un power-user averti.
+
+Règles de communication et d'exécution :
+1. Précision chirurgicale : Va droit au but. Utilise la nomenclature exacte des composants, les valeurs précises et les brochages sans aucune approximation théorique superflue.
+2. Priorité à la sécurité et à l'intégrité : 
+   - Intègre systématiquement les mesures de sécurité indispensables (tensions maximales, risques de court-circuit, sens des polarisations, découplages obligatoires à 100nF).
+   - Signale immédiatement tout risque d'instabilité, de boucle de masse ou de destruction de matériel.
+   - En contexte open-source ou de déploiement, rappelle l'isolation stricte des secrets (variables d'environnement, absence de clés ou de données personnelles hardcodées dans le code).
+3. Utilisation de l'inventaire : Exploite en priorité absolue les composants disponibles pour proposer des montages réalisables immédiatement.
+4. Format : Réponds en français structuré (Markdown clair, listes à puces, pas de formules de politesse inutiles).`;
+
 app.post('/api/ai/query', async (req, res) => {
   try {
-    const { prompt, inventory } = req.body;
+    const { prompt, inventory, mode = 'pedagogue', image } = req.body;
 
     if (!prompt || typeof prompt !== 'string') {
       res.status(400).json({ error: 'Le paramètre "prompt" est requis et doit être une chaîne.' });
@@ -66,28 +90,56 @@ app.post('/api/ai/query', async (req, res) => {
         .join('\n');
     }
 
-    const systemInstruction = `Tu es un ingénieur en électronique senior et un assistant d'atelier expérimenté.
-Tu conseilles un électronicien sur la conception de circuits, le choix de composants, les équivalences, le brochage, les calculs de valeurs et les montages.
-Voici l'état actuel et vérifié de son stock de composants disponible dans l'atelier :
+    // Sélection du profil de prompt validé
+    const baseInstruction = mode === 'chirurgical' ? SYSTEM_PROMPT_CHIRURGICAL : SYSTEM_PROMPT_PEDAGOGUE;
+    const systemInstruction = `${baseInstruction}
 
-${inventorySummary}
+--- INVENTAIRE RÉEL EN STOCK DANS L'ATELIER ---
+${inventorySummary}`;
 
-Règles de réponse :
-1. Privilégie EXCLUSIVEMENT ou en priorité les composants réellement présents dans son stock ci-dessus.
-2. Si un composant passif basique indispensable manque (ex: résistance de pull-up, condensateur de découplage 100nF, diode 1N4148), précise-le clairement.
-3. Sois précis sur les contraintes techniques (tensions max, brochage, dissipation thermique, fréquence).
-4. Réponds en français clair, structuré avec des titres et listes bien formatées en Markdown.`;
+    // Construction du payload multimodal (Texte + Image redimensionnée optionnelle)
+    const contents: any[] = [];
+
+    if (image && typeof image === 'string') {
+      let mimeType = 'image/jpeg';
+      let base64Data = image;
+
+      if (image.startsWith('data:')) {
+        const match = image.match(/^data:([^;]+);base64,(.+)$/);
+        if (match) {
+          mimeType = match[1];
+          base64Data = match[2];
+        } else {
+          const commaIndex = image.indexOf(',');
+          if (commaIndex !== -1) {
+            base64Data = image.slice(commaIndex + 1);
+          }
+        }
+      }
+
+      contents.push({
+        inlineData: {
+          data: base64Data,
+          mimeType: mimeType
+        }
+      });
+    }
+
+    contents.push(prompt);
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.1-flash-lite',
-      contents: prompt,
+      contents,
       config: {
-        systemInstruction
+        systemInstruction,
+        stopSequences: [
+          "\n\n---"
+        ]
       }
     });
 
     const reply = response.text || "Aucune réponse générée par le modèle.";
-    res.json({ reply });
+    res.json({ reply, mode });
   } catch (error: any) {
     console.error('[API /api/ai/query] Erreur :', error);
     const message = error?.message || 'Erreur lors du traitement de la requête IA.';
