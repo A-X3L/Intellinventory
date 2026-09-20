@@ -1,0 +1,6 @@
+{
+  "name": "Intellinventory",
+  "description": "Système de gestion d'inventaire et d'atelier pour composants électroniques avec assistant IA sécurisé et persistance robuste.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

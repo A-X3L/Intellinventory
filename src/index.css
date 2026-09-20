@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   FEUILLE DE STYLE IMPRESSION ATELIER (@media print)
+   Optimisée pour une lisibilité maximale près du fer à souder (encre noire,
+   fond blanc pur, fort contraste, casiers et références isolés).
+   ========================================================================== */
+
+@media print {
+  /* Élimination des fonds sombres et forçage du contraste maximal */
+  *,
+  *::before,
+  *::after {
+    background-color: transparent !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    font-size: 9.5pt !important;
+    line-height: 1.25 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  @page {
+    margin: 8mm 10mm;
+    size: A4 portrait;
+  }
+
+  /* Masquer tous les éléments d'interface non imprimables */
+  header,
+  footer,
+  nav,
+  button,
+  input,
+  select,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Conteneur principal plein format */
+  main {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Tableau d'inventaire industriel en impression */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    border: 1.5pt solid #000000 !important;
+    font-size: 8.5pt !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+
+  th {
+    border: 1pt solid #000000 !important;
+    background-color: #f3f4f6 !important;
+    color: #000000 !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    padding: 4pt 6pt !important;
+    text-align: left !important;
+  }
+
+  td {
+    border: 0.5pt solid #6b7280 !important;
+    padding: 4pt 6pt !important;
+    vertical-align: top !important;
+    color: #000000 !important;
+  }
+
+  /* Mise en valeur des références, casiers et quantités */
+  .font-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  }
+
+  /* Fiches techniques individuelles isolées (si modal ouvert à l'impression) */
+  .fixed {
+    position: static !important;
+  }
+
+  .z-50 {
+    z-index: auto !important;
+  }
+
+  .bg-slate-900\/80,
+  .backdrop-blur-sm {
+    background: transparent !important;
+    backdrop-filter: none !important;
+  }
+}
