@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="16" fill="#0f172a"/>
+  <!-- Robot head -->
+  <rect x="16" y="20" width="32" height="28" rx="6" fill="#1e293b" stroke="#06b6d4" stroke-width="2"/>
+  <!-- Antenna with bolt -->
+  <line x1="32" y1="10" x2="32" y2="20" stroke="#06b6d4" stroke-width="2"/>
+  <circle cx="32" cy="8" r="3" fill="#eab308"/>
+  <!-- Eyes glowing cyan -->
+  <circle cx="26" cy="30" r="4" fill="#06b6d4"/>
+  <circle cx="38" cy="30" r="4" fill="#06b6d4"/>
+  <!-- Lightning bolt overlay (Zeus / Elec) -->
+  <path d="M34 18 L26 34 L32 34 L28 48 L40 32 L34 32 Z" fill="#f59e0b" stroke="#fef08a" stroke-width="1"/>
+</svg>

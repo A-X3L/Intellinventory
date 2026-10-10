@@ -8,7 +8,8 @@ import {
   ElectronicComponent, 
   InventoryFilter, 
   StockMetrics,
-  DEFAULT_COMPONENTS_SEEDS
+  DEFAULT_COMPONENTS_SEEDS,
+  normalizePackageFormat
 } from './core/domain/types';
 import { componentRepository } from './infrastructure/persistence/indexed-db.repository';
 import { AiService, AiStatusResponse } from './services/ai.service';
@@ -22,8 +23,14 @@ import {
   AIModal, 
   ExportImportModal 
 } from './components/modals';
+import { CaptureTerminal } from './components/CaptureTerminal';
 
 export default function App() {
+  // Routing léger pour le Terminal Mobile (/capture)
+  if (typeof window !== 'undefined' && window.location.pathname === '/capture') {
+    return <CaptureTerminal />;
+  }
+
   const [components, setComponents] = useState<ElectronicComponent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [aiStatus, setAiStatus] = useState<AiStatusResponse | null>(null);
@@ -38,7 +45,39 @@ export default function App() {
     sortDirection: 'asc'
   });
 
-  // États des boîtes de dialogue modales
+  // État de notification de capture distante
+  const [latestRemoteCapture, setLatestRemoteCapture] = useState<{ id: string; type: string; timestamp: string } | null>(null);
+
+  // Écoute synchrone des médias transmis par le Terminal Mobile
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource('/api/capture/stream');
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          setLatestRemoteCapture({
+            id: data.id,
+            type: data.type,
+            timestamp: data.timestamp
+          });
+          // Auto-dissimulation du toast après 6 secondes
+          setTimeout(() => {
+            setLatestRemoteCapture(null);
+          }, 6000);
+        } catch (e) {
+          console.error('Erreur parsing SSE capture :', e);
+        }
+      };
+    } catch (err) {
+      console.warn('SSE non supporté ou indisponible.');
+    }
+
+    return () => {
+      eventSource?.close();
+    };
+  }, []);
+
   const [isComponentModalOpen, setIsComponentModalOpen] = useState(false);
   const [componentToEdit, setComponentToEdit] = useState<ElectronicComponent | null>(null);
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
@@ -54,26 +93,12 @@ export default function App() {
         await componentRepository.init();
         const loaded = await componentRepository.getAll();
         if (isMounted) {
-          if (loaded && loaded.length > 0) {
-            setComponents(loaded);
-          } else {
-            const fallbackDefaults = DEFAULT_COMPONENTS_SEEDS.map((s) => ({
-              ...s,
-              id: `seed-${s.ref.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-              updatedAt: Date.now()
-            }));
-            setComponents(fallbackDefaults);
-          }
+          setComponents(loaded || []);
         }
       } catch (err) {
         console.error('Erreur d\'initialisation IndexedDB :', err);
         if (isMounted) {
-          const fallbackDefaults = DEFAULT_COMPONENTS_SEEDS.map((s) => ({
-            ...s,
-            id: `seed-${s.ref.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-            updatedAt: Date.now()
-          }));
-          setComponents(fallbackDefaults);
+          setComponents([]);
         }
       } finally {
         if (isMounted) {
@@ -108,17 +133,40 @@ export default function App() {
     const totalReferences = components.length;
     let totalQuantity = 0;
     let cmsCount = 0;
+    let cmsRefsCount = 0;
     let dipCount = 0;
+    let dipRefsCount = 0;
     let moduleCount = 0;
+    let moduleRefsCount = 0;
     let lowStockCount = 0;
 
     for (const c of components) {
-      totalQuantity += c.quantity || 0;
-      if (c.package === 'CMS/SMD') cmsCount++;
-      else if (c.package === 'Traversant/DIP') dipCount++;
-      else if (c.package === 'Module' || c.package === 'Récupération') moduleCount++;
+      const rawQty = (c as any).stock ?? c.quantity ?? 0;
+      const qty = typeof rawQty === 'number'
+        ? (Number.isFinite(rawQty) ? Math.max(0, Math.floor(rawQty)) : 0)
+        : (parseInt(String(rawQty || 0), 10) || 0);
 
-      if (c.quantity <= c.minQuantity) {
+      const rawMinQty = (c as any).minStock ?? c.minQuantity ?? 0;
+      const minQty = typeof rawMinQty === 'number'
+        ? (Number.isFinite(rawMinQty) ? Math.max(0, Math.floor(rawMinQty)) : 0)
+        : (parseInt(String(rawMinQty || 0), 10) || 0);
+
+      totalQuantity += qty;
+
+      const pkgFormat = normalizePackageFormat(c.package, c.footprint);
+
+      if (pkgFormat === 'CMS/SMD') {
+        cmsCount += qty;
+        cmsRefsCount++;
+      } else if (pkgFormat === 'Traversant/DIP') {
+        dipCount += qty;
+        dipRefsCount++;
+      } else if (pkgFormat === 'Module') {
+        moduleCount += qty;
+        moduleRefsCount++;
+      }
+
+      if (qty <= minQty) {
         lowStockCount++;
       }
     }
@@ -127,8 +175,11 @@ export default function App() {
       totalReferences,
       totalQuantity,
       cmsCount,
+      cmsRefsCount,
       dipCount,
+      dipRefsCount,
       moduleCount,
+      moduleRefsCount,
       categoriesCount: availableCategories.length,
       lowStockCount
     };
@@ -154,7 +205,7 @@ export default function App() {
         );
 
         const matchCat = filter.category === 'ALL' || item.category === filter.category;
-        const matchPkg = filter.packageType === 'ALL' || item.package === filter.packageType;
+        const matchPkg = filter.packageType === 'ALL' || normalizePackageFormat(item.package, item.footprint) === filter.packageType;
         const matchLow = !filter.lowStockOnly || (item.quantity <= item.minQuantity);
 
         return matchSearch && matchCat && matchPkg && matchLow;
@@ -201,7 +252,7 @@ export default function App() {
       pins: data.pins?.trim() || 'N/A',
       footprint: data.footprint?.trim() || 'N/A',
       category: data.category?.trim() || 'Divers',
-      package: data.package || 'CMS/SMD',
+      package: normalizePackageFormat(data.package, data.footprint),
       functionDesc: data.functionDesc?.trim() || '',
       description: data.description?.trim() || '',
       quantity: Math.max(0, parseInt(String(data.quantity), 10) || 0),
@@ -348,6 +399,32 @@ export default function App() {
           </span>
         </div>
       </footer>
+
+      {/* Notification Toast de capture synchrone depuis smartphone */}
+      {latestRemoteCapture && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 border-2 border-emerald-500/80 text-white p-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 backdrop-blur-md">
+          <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            </span>
+          </div>
+          <div>
+            <p className="text-xs font-bold text-emerald-300">
+              Média reçu du Terminal Mobile (/capture)
+            </p>
+            <p className="text-[11px] text-slate-300">
+              Type : <strong className="uppercase font-mono">{latestRemoteCapture.type}</strong> • Reçu à {latestRemoteCapture.timestamp}
+            </p>
+          </div>
+          <button
+            onClick={() => setIsScannerModalOpen(true)}
+            className="ml-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition shadow-md shadow-emerald-600/30 whitespace-nowrap"
+          >
+            Ouvrir Scanner
+          </button>
+        </div>
+      )}
 
       {/* Boîtes modales */}
       <ComponentModal

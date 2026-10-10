@@ -226,7 +226,6 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               <option value="ALL" className="bg-slate-900">Tous les formats</option>
               <option value="CMS/SMD" className="bg-slate-900">CMS / SMD</option>
               <option value="Traversant/DIP" className="bg-slate-900">Traversant / DIP</option>
-              <option value="Récupération" className="bg-slate-900">Récupération</option>
               <option value="Module" className="bg-slate-900">Modules</option>
             </select>
           </div>

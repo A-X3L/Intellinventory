@@ -512,7 +512,6 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
                   >
                     <option value="CMS/SMD">CMS / SMD</option>
                     <option value="Traversant/DIP">Traversant / DIP</option>
-                    <option value="Récupération">Récupération</option>
                     <option value="Module">Module PCB</option>
                   </select>
                 </div>

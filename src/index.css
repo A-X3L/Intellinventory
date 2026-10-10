@@ -105,4 +105,66 @@
     background: transparent !important;
     backdrop-filter: none !important;
   }
+
+  /* ==========================================================================
+     IMPRESSION PROTOCOLE TECHNIQUE ASSISTANT IA (Point 4)
+     Isolation complète de l'historique de conversation
+     ========================================================================== */
+  body.ai-printing main,
+  body.ai-modal-open main {
+    display: none !important;
+  }
+
+  body.ai-printing .ai-no-print,
+  body.ai-modal-open .ai-no-print {
+    display: none !important;
+  }
+
+  body.ai-printing [role="dialog"],
+  body.ai-modal-open [role="dialog"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  body.ai-printing .ai-chat-thread,
+  body.ai-modal-open .ai-chat-thread {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+  }
+
+  body.ai-printing .ai-message-card,
+  body.ai-modal-open .ai-message-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 8pt !important;
+    width: 100% !important;
+    display: block !important;
+  }
+
+  body.ai-printing .ai-message-bubble,
+  body.ai-modal-open .ai-message-bubble {
+    border: 1pt solid #475569 !important;
+    border-radius: 4pt !important;
+    padding: 6pt 8pt !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+  }
+
+  body.ai-printing .ai-message-bubble *,
+  body.ai-modal-open .ai-message-bubble * {
+    color: #000000 !important;
+  }
 }

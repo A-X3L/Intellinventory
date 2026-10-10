@@ -211,6 +211,21 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
                 </div>
                 <Download className="w-4 h-4 text-slate-400 group-hover:text-emerald-400 transition" />
               </button>
+
+              <a
+                href="/inventaire_source.csv"
+                download="inventaire_source.csv"
+                className="col-span-1 sm:col-span-2 flex items-center justify-between p-3 rounded-xl bg-emerald-950/30 border border-emerald-700/50 hover:border-emerald-500 text-slate-200 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                  <div className="text-left">
+                    <p className="font-semibold text-xs text-emerald-300">Fichier Source de Vérité (CSV Original)</p>
+                    <p className="text-[10px] text-slate-400">Télécharger le fichier de référence source (59 composants certifiés)</p>
+                  </div>
+                </div>
+                <Download className="w-4 h-4 text-slate-400 group-hover:text-emerald-400 transition" />
+              </a>
             </div>
           </div>
 

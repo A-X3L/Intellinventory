@@ -27,13 +27,13 @@ export const ComponentModal: React.FC<ComponentModalProps> = ({
     type: '',
     pins: '',
     footprint: 'SOIC-8',
-    category: 'Logique',
+    category: CATEGORIES_LIST[0],
     package: 'CMS/SMD',
     functionDesc: '',
     description: '',
-    quantity: 10,
-    minQuantity: 3,
-    location: 'Casier A-01',
+    quantity: 1,
+    minQuantity: 1,
+    location: 'Atelier',
     datasheetUrl: '',
     imageUrl: ''
   });
@@ -51,8 +51,8 @@ export const ComponentModal: React.FC<ComponentModalProps> = ({
         family: '',
         type: '',
         pins: '',
-        footprint: 'SOIC-8',
-        category: 'Logique',
+        footprint: 'CMS / SMD',
+        category: CATEGORIES_LIST[0],
         package: 'CMS/SMD',
         functionDesc: '',
         description: '',
@@ -219,7 +219,6 @@ export const ComponentModal: React.FC<ComponentModalProps> = ({
               >
                 <option value="CMS/SMD">CMS / SMD</option>
                 <option value="Traversant/DIP">Traversant / DIP</option>
-                <option value="Récupération">Récupération</option>
                 <option value="Module">Module PCB</option>
               </select>
             </div>
@@ -236,7 +235,7 @@ export const ComponentModal: React.FC<ComponentModalProps> = ({
                 list="category-suggestions"
                 value={formData.category || ''}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="ex: Logique, Alimentation, Discrets"
+                placeholder="ex: Registre à décalage (SIPO), Optocoupleur..."
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
               />
               <datalist id="category-suggestions">

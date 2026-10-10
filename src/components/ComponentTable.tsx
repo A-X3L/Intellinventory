@@ -20,7 +20,7 @@ import {
   Cpu,
   Recycle
 } from 'lucide-react';
-import { ElectronicComponent, InventoryFilter } from '../core/domain/types';
+import { ElectronicComponent, InventoryFilter, normalizePackageFormat } from '../core/domain/types';
 
 interface ComponentTableProps {
   components: ElectronicComponent[];
@@ -141,8 +141,8 @@ export const ComponentTable: React.FC<ComponentTableProps> = ({
           <tbody className="divide-y divide-slate-700/50">
             {components.map((item, index) => {
               const isLowStock = item.quantity <= item.minQuantity;
-              const isRecycled = item.source === 'Récupération' || item.package === ('Récupération' as any);
-              const displayPackage = item.package === ('Récupération' as any) ? 'Module' : item.package;
+              const isRecycled = item.source === 'Récupération';
+              const displayPackage = normalizePackageFormat(item.package, item.footprint);
 
               return (
                 <tr 

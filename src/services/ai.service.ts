@@ -11,7 +11,7 @@ export interface AiStatusResponse {
   protection: string;
 }
 
-export type AiProfileMode = 'pedagogue' | 'chirurgical';
+export type AiProfileMode = 'pedagogue' | 'chirurgical' | 'docbrown';
 
 export interface AskQuestionOptions {
   prompt: string;
@@ -25,7 +25,7 @@ export interface ScannedComponentData {
   family: string;
   type: string;
   category: string;
-  format: 'CMS/SMD' | 'Traversant/DIP' | 'Récupération' | 'Module';
+  format: 'CMS/SMD' | 'Traversant/DIP' | 'Module';
   footprint: string;
   pins: string;
   functionDesc: string;

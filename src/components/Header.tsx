@@ -67,6 +67,19 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Scanner un composant</span>
           </button>
 
+          {/* Bouton Terminal Mobile (/capture) */}
+          <a
+            id="btn-open-mobile-capture"
+            href="/capture"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-amber-600 hover:bg-amber-500 active:scale-95 text-white px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 shadow-md shadow-amber-600/25 border border-amber-500/30"
+            title="Ouvrir le Terminal de Capture Distant pour Smartphone / Tablette"
+          >
+            <Camera className="w-4 h-4 text-amber-200" />
+            <span>Terminal Mobile</span>
+          </a>
+
           {/* Bouton Assistant IA avec indicateur */}
           <button
             id="btn-open-ai"

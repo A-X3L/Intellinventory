@@ -11,9 +11,40 @@ import { GoogleGenAI } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+// Verrouillage strict du port réseau : Fixé de manière permanente sur le port 3000
+const PORT = 3000;
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '25mb' }));
+
+// Middleware d'intégration des fichiers d'habillage (.icl et .cul)
+app.use((req, res, next) => {
+  if (req.path.endsWith('.icl')) {
+    res.setHeader('Content-Type', 'application/x-icl');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+  } else if (req.path.endsWith('.cul')) {
+    res.setHeader('Content-Type', 'application/x-cul');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+  }
+  next();
+});
+
+// Bus d'événements en mémoire pour le Terminal de Capture Distant (/capture)
+interface CapturedMedia {
+  id: string;
+  type: 'photo' | 'audio';
+  dataUrl: string;
+  timestamp: string;
+  notes?: string;
+}
+
+const captureQueue: CapturedMedia[] = [];
+const sseClients: express.Response[] = [];
+
+// Broadcast SSE aux sessions actives sur PC
+function broadcastCapturedMedia(media: CapturedMedia) {
+  const payload = `data: ${JSON.stringify(media)}\n\n`;
+  sseClients.forEach((client) => client.write(payload));
+}
 
 // Client Gemini initialisé à la demande
 let geminiClient: GoogleGenAI | null = null;
@@ -35,6 +66,53 @@ function getGeminiClient(): GoogleGenAI {
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ----------------------------------------------------
+// Terminal de Capture Distant (/capture) & Flux Synchrone
+// ----------------------------------------------------
+
+// Envoi d'un média depuis un smartphone ou terminal mobile
+app.post('/api/capture/push', (req, res) => {
+  const { type, dataUrl, notes } = req.body;
+  if (!type || !dataUrl) {
+    return res.status(400).json({ error: "Type et dataUrl requis." });
+  }
+
+  const media: CapturedMedia = {
+    id: `cap-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    type: type === 'audio' ? 'audio' : 'photo',
+    dataUrl,
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    notes: notes || ''
+  };
+
+  captureQueue.unshift(media);
+  if (captureQueue.length > 50) captureQueue.pop();
+
+  broadcastCapturedMedia(media);
+
+  res.json({ success: true, id: media.id, timestamp: media.timestamp });
+});
+
+// Flux SSE synchrone pour alimenter le grand écran PC
+app.get('/api/capture/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  sseClients.push(res);
+
+  req.on('close', () => {
+    const idx = sseClients.indexOf(res);
+    if (idx !== -1) sseClients.splice(idx, 1);
+  });
+});
+
+// Historique récent des captures
+app.get('/api/capture/recent', (_req, res) => {
+  res.json({ queue: captureQueue });
 });
 
 app.get('/api/ai/status', (_req, res) => {
@@ -70,6 +148,48 @@ Règles de communication et d'exécution :
 3. Utilisation de l'inventaire : Exploite en priorité absolue les composants disponibles pour proposer des montages réalisables immédiatement.
 4. Format : Réponds en français structuré (Markdown clair, listes à puces, pas de formules de politesse inutiles).`;
 
+const SYSTEM_PROMPT_DOCBROWN = `Tu es le Professeur Emmett Lathrop Brown, inventeur excentrique et chef d’atelier temporel. Tu t’adresses à un power-user averti qui possède un stock réel de composants électroniques.
+
+Règles de communication et d’exécution (non négociables) :
+
+1. Personnalité
+- Tu parles exactement comme le Doc Brown : enthousiaste, théâtral, avec des expressions caractéristiques (« Great Scott ! », « Nom de Zeus ! », « 1.21 gigawatts ! », « continuum spatio-temporel », « paradoxe temporel », etc.).
+- Tu peux faire de brèves digressions loufoques, mais tu reviens TOUJOURS au conseil technique concret en moins de deux phrases.
+- Tu tutoyes et tu agis comme un collègue de labo brillant mais légèrement fou.
+
+2. Priorité absolue à l’inventaire
+- Tu n’utilises QUE les composants réellement présents dans le stock de l’utilisateur.
+- Tu n’inventes JAMAIS de composants absents du stock.
+- Si une solution optimale nécessite un composant manquant, tu le signales clairement et tu proposes la meilleure alternative réaliste avec ce qui est disponible.
+
+3. Exigence de solutions robustes et classiques
+- Tu privilégies TOUJOURS les solutions techniques éprouvées et sûres.
+- En cas de différence de tension (exemple : microcontrôleur 3,3 V et logique 5 V), tu utilises un vrai level shifting propre (buffer alimenté en 5 V) plutôt que des solutions limites ou « qui marchent à peu près ».
+- Tu évites les architectures où les sorties d’un circuit à 3,3 V pilotent des charges alimentées en 5 V de façon non franche.
+- Tu refuses les montages qui laissent des entrées CMOS flottantes ou qui créent des risques de conflit de bus non maîtrisés.
+
+4. Sécurité et intégrité (priorité maximale – application open source)
+- Tu intègres systématiquement les mesures de sécurité dans chaque réponse technique.
+- Découplage 100 nF céramique au plus près de chaque circuit intégré : obligatoire.
+- Gestion stricte des courants (notamment limite de courant total du 74HC595).
+- Protection contre les courts-circuits, conflits de bus et états flottants.
+- Séquence d’initialisation sécurisée au démarrage.
+- Tu signales clairement tout risque de destruction de matériel ou de comportement instable.
+- Tu rappelles les bonnes pratiques de manipulation (ESD, polarité, tension maximale).
+
+5. Format de réponse
+- Français structuré en Markdown clair.
+- Structure recommandée pour les réponses techniques :
+  1. Analyse du problème et des risques
+  2. Solution retenue (justifiée par rapport au stock et à la robustesse)
+  3. Câblage détaillé (broche à broche)
+  4. Séquence d’initialisation
+  5. Checklist de sécurité multimètre
+- Termine souvent par une phrase du type :  
+  « Et n’oublie jamais… le futur n’est pas encore écrit… mais ce découplage de 100 nF, lui, est absolument obligatoire ! »
+
+Tu as accès en temps réel à l’inventaire de composants. Utilise-le en priorité absolue et reste strictement fidèle à ce qui est réellement disponible.`;
+
 app.post('/api/ai/query', async (req, res) => {
   try {
     const { prompt, inventory, mode = 'pedagogue', image } = req.body;
@@ -90,8 +210,21 @@ app.post('/api/ai/query', async (req, res) => {
         .join('\n');
     }
 
-    // Sélection du profil de prompt validé
-    const baseInstruction = mode === 'chirurgical' ? SYSTEM_PROMPT_CHIRURGICAL : SYSTEM_PROMPT_PEDAGOGUE;
+    // Sélection du profil de prompt et du modèle selon le mode
+    let baseInstruction = SYSTEM_PROMPT_PEDAGOGUE;
+    let selectedModel = 'gemini-3.1-flash-lite';
+
+    if (mode === 'docbrown') {
+      baseInstruction = SYSTEM_PROMPT_DOCBROWN;
+      selectedModel = 'gemini-3.5-flash-lite'; // Profil d'élite suprême surclassant les deux autres
+    } else if (mode === 'chirurgical') {
+      baseInstruction = SYSTEM_PROMPT_CHIRURGICAL;
+      selectedModel = 'gemini-3.1-flash-lite';
+    } else {
+      baseInstruction = SYSTEM_PROMPT_PEDAGOGUE;
+      selectedModel = 'gemini-3.1-flash-lite';
+    }
+
     const systemInstruction = `${baseInstruction}
 
 --- INVENTAIRE RÉEL EN STOCK DANS L'ATELIER ---
@@ -127,16 +260,37 @@ ${inventorySummary}`;
 
     contents.push(prompt);
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite',
-      contents,
-      config: {
-        systemInstruction,
-        stopSequences: [
-          "\n\n---"
-        ]
-      }
-    });
+    // Dynamic config with explicit internet search enabled for all 3 profiles
+    const config: any = {
+      systemInstruction,
+      tools: [{ googleSearch: {} }], // webSearch: true pour les 3 profils
+      stopSequences: [
+        "\n\n---"
+      ]
+    };
+
+    if (mode === 'docbrown') {
+      config.thinkingConfig = {
+        thinkingLevel: 'HIGH'
+      };
+    }
+
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model: selectedModel,
+        contents,
+        config
+      });
+    } catch (modelErr) {
+      // Fallback au modèle standard si 3.5 n'est pas disponible
+      console.warn(`[API /api/ai/query] Fallback du modèle ${selectedModel} vers gemini-3.1-flash-lite:`, modelErr);
+      response = await ai.models.generateContent({
+        model: 'gemini-3.1-flash-lite',
+        contents,
+        config
+      });
+    }
 
     const reply = response.text || "Aucune réponse générée par le modèle.";
     res.json({ reply, mode });
@@ -223,7 +377,7 @@ Analyse méticuleusement cette photo de composant électronique :
 1. Déchiffre le marquage sérigraphié visible sur le composant (ex: 74HC595, NE555, LM358, IRFZ44N, ESP32, AMS1117, ATmega328P, BC547, 1N4007, etc.). Si une partie est floue ou partielle, déduis la référence la plus probable en fonction du contexte et de la taille du boîtier.
 2. Identifie la famille technologique (ex: Logique TTL/CMOS, Amplificateur Opérationnel, Régulateur Linéaire LDO, MOSFET canal N, Microcontrôleur, Diode de redressement, etc.).
 3. Identifie le type fonctionnel précis.
-4. Détermine le format physique : choisis impérativement parmi "CMS/SMD", "Traversant/DIP", "Récupération", ou "Module".
+4. Détermine le format physique : choisis impérativement parmi "CMS/SMD", "Traversant/DIP", ou "Module".
 5. Détermine le boîtier normalisé (footprint) : ex: "SOIC-8", "SOIC-16", "DIP-8", "DIP-14", "DIP-16", "TO-220", "SOT-23", "SOT-223", "0805", "1206", "LQFP-48", "Module PCB", etc.
 6. Compte ou indique le nombre de broches (pins).
 7. Classe-le dans une catégorie parmi : "Logique", "Buffer / Pilote", "Analogique", "Alimentation", "Discrets", "Optoélectronique", "Mémoire", "Modules", "Microcontrôleurs", "Capteurs", "Connectique".
@@ -235,7 +389,7 @@ Tu DOIS impérativement répondre sous la forme d'un objet JSON strict valide sa
   "family": string,
   "type": string,
   "category": string,
-  "format": "CMS/SMD" | "Traversant/DIP" | "Récupération" | "Module",
+  "format": "CMS/SMD" | "Traversant/DIP" | "Module",
   "footprint": string,
   "pins": string,
   "functionDesc": string,

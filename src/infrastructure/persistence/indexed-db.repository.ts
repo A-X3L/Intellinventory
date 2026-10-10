@@ -1,16 +1,64 @@
 /**
  * @file indexed-db.repository.ts
- * @description Adaptateur de persistance IndexedDB asynchrone robuste avec fallback mémoire/localStorage et seeding idempotent
+ * @description Adaptateur de persistance IndexedDB asynchrone robuste avec fallback mémoire/localStorage et seeding statique strict
  */
 
-import { ElectronicComponent, DEFAULT_COMPONENTS_SEEDS } from '../../core/domain/types';
+import { ElectronicComponent, normalizePackageFormat, DEFAULT_COMPONENTS_SEEDS } from '../../core/domain/types';
 import { IComponentRepository } from '../../core/ports/repository.port';
 
 const DB_NAME = 'ElecInventoryDB_v2';
 const STORE_NAME = 'electronic_components';
 const DB_VERSION = 1;
-const SEED_FLAG_KEY = 'app_db_initialized_v1';
+const SEED_FLAG_KEY = 'app_db_initialized_v9_full_truth_59';
 const FALLBACK_STORAGE_KEY = 'elec_inventory_indexeddb_fallback';
+
+/**
+ * Tableau statique brut strict définissant les composants réels avec leurs quantités unitaires exactes.
+ * Issu directement du fichier CSV source de vérité (src/data/inventaire_source.csv).
+ */
+export const STATIC_SEED_COMPONENTS: Omit<ElectronicComponent, 'id' | 'updatedAt'>[] = DEFAULT_COMPONENTS_SEEDS;
+
+/**
+ * Fonction de seed de la base IndexedDB avec purge préalable pour éliminer tout doublon
+ */
+export async function seedDatabase(db: IDBDatabase): Promise<ElectronicComponent[]> {
+  // Purge impérative pour éviter les doublons
+  await new Promise<void>((resolve, reject) => {
+    try {
+      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const clearRequest = store.clear();
+      clearRequest.onsuccess = () => resolve();
+      clearRequest.onerror = () => reject(clearRequest.error);
+    } catch (err) {
+      reject(err);
+    }
+  });
+
+  // Insertion unique des éléments de référence statiques
+  const now = Date.now();
+  const defaults: ElectronicComponent[] = STATIC_SEED_COMPONENTS.map((seed, idx) => ({
+    ...seed,
+    id: `seed-${idx + 1}-${seed.ref.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+    updatedAt: now
+  }));
+
+  await new Promise<void>((resolve, reject) => {
+    try {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const st = tx.objectStore(STORE_NAME);
+      for (const item of defaults) {
+        st.put(item);
+      }
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    } catch (err) {
+      reject(err);
+    }
+  });
+
+  return defaults;
+}
 
 export class IndexedDbComponentRepository implements IComponentRepository {
   private db: IDBDatabase | null = null;
@@ -19,8 +67,7 @@ export class IndexedDbComponentRepository implements IComponentRepository {
   private isInitialized = false;
 
   constructor() {
-    // Initialise le cache mémoire avec les composants d'usine par défaut
-    this.memoryCache = this.generateDefaultSeeds();
+    this.memoryCache = [];
   }
 
   /**
@@ -31,9 +78,9 @@ export class IndexedDbComponentRepository implements IComponentRepository {
       return;
     }
 
-    // 1. Initialiser le cache mémoire à partir du stockage local si disponible
+    const hasSeeded = typeof window !== 'undefined' && localStorage.getItem(SEED_FLAG_KEY) === 'true';
     const cachedLocal = this.getFromLocalStorage();
-    if (cachedLocal.length > 0) {
+    if (hasSeeded && cachedLocal.length >= STATIC_SEED_COMPONENTS.length) {
       this.memoryCache = cachedLocal;
     }
 
@@ -45,31 +92,22 @@ export class IndexedDbComponentRepository implements IComponentRepository {
     }
 
     try {
-      // Ouverture avec timeout de 1500ms pour ne jamais bloquer l'UI
       this.db = await this.openDatabaseWithTimeout(1500);
+      const dbItems = await this.getAllFromStore();
 
-      // Vérification du seeding idempotent via la clé localStorage
-      const hasSeeded = localStorage.getItem(SEED_FLAG_KEY) === 'true';
-
-      if (!hasSeeded) {
-        // Premier lancement : vérifier si la base est vide
-        const count = await this.countSafe();
-        if (count === 0) {
-          const defaults = this.generateDefaultSeeds();
-          await this.putBatchToStore(defaults);
-          this.memoryCache = defaults;
-          this.saveToLocalStorage(defaults);
-        }
+      if (!hasSeeded || dbItems.length < STATIC_SEED_COMPONENTS.length) {
+        const defaults = await seedDatabase(this.db);
+        this.memoryCache = defaults;
+        this.saveToLocalStorage(defaults);
         localStorage.setItem(SEED_FLAG_KEY, 'true');
+      } else if (dbItems.length > 0) {
+        this.memoryCache = dbItems;
+        this.saveToLocalStorage(dbItems);
       } else {
-        // Déjà initialisé : si pour une raison quelconque la base est vide, réparer avec les seeds
-        const count = await this.countSafe();
-        if (count === 0) {
-          const defaults = this.generateDefaultSeeds();
-          await this.putBatchToStore(defaults);
-          this.memoryCache = defaults;
-          this.saveToLocalStorage(defaults);
-        }
+        const defaults = await seedDatabase(this.db);
+        this.memoryCache = defaults;
+        this.saveToLocalStorage(defaults);
+        localStorage.setItem(SEED_FLAG_KEY, 'true');
       }
     } catch (err) {
       console.warn('[IndexedDB] Ouverture impossible ou expirée, bascule en mode mémoire/localStorage :', err);
@@ -81,11 +119,18 @@ export class IndexedDbComponentRepository implements IComponentRepository {
   }
 
   private checkAndSeedFallback(): void {
-    const hasSeeded = localStorage.getItem(SEED_FLAG_KEY) === 'true';
-    if (!hasSeeded || this.memoryCache.length === 0) {
-      const defaults = this.generateDefaultSeeds();
-      this.memoryCache = defaults;
-      this.saveToLocalStorage(defaults);
+    const hasSeeded = typeof window !== 'undefined' && localStorage.getItem(SEED_FLAG_KEY) === 'true';
+    const cachedLocal = this.getFromLocalStorage();
+
+    if (hasSeeded && cachedLocal.length >= STATIC_SEED_COMPONENTS.length) {
+      this.memoryCache = cachedLocal;
+      return;
+    }
+
+    const defaults = this.generateDefaultSeeds();
+    this.memoryCache = defaults;
+    this.saveToLocalStorage(defaults);
+    if (typeof window !== 'undefined') {
       localStorage.setItem(SEED_FLAG_KEY, 'true');
     }
   }
@@ -152,9 +197,6 @@ export class IndexedDbComponentRepository implements IComponentRepository {
     });
   }
 
-  /**
-   * Compte sécurisé des composants
-   */
   public async count(): Promise<number> {
     return this.countSafe();
   }
@@ -178,9 +220,6 @@ export class IndexedDbComponentRepository implements IComponentRepository {
     });
   }
 
-  /**
-   * Vide intégralement le magasin de données
-   */
   public async clear(): Promise<void> {
     this.memoryCache = [];
     this.saveToLocalStorage([]);
@@ -203,9 +242,6 @@ export class IndexedDbComponentRepository implements IComponentRepository {
     });
   }
 
-  /**
-   * Recherche par référence
-   */
   public async getByRef(ref: string): Promise<ElectronicComponent | null> {
     const cleanRef = ref.trim().toLowerCase();
     if (!cleanRef) return null;
@@ -214,13 +250,8 @@ export class IndexedDbComponentRepository implements IComponentRepository {
     return all.find((c) => c.ref.trim().toLowerCase() === cleanRef) || null;
   }
 
-  /**
-   * Récupère tous les composants de façon résiliente
-   */
-  public async getAll(): Promise<ElectronicComponent[]> {
-    if (this.isFallbackMode || !this.db) {
-      return [...this.memoryCache];
-    }
+  private async getAllFromStore(): Promise<ElectronicComponent[]> {
+    if (!this.db) return [];
 
     return new Promise((resolve) => {
       try {
@@ -229,27 +260,38 @@ export class IndexedDbComponentRepository implements IComponentRepository {
         const req = store.getAll();
 
         req.onsuccess = () => {
-          const list = req.result || [];
-          if (list.length > 0) {
-            this.memoryCache = list;
-            this.saveToLocalStorage(list);
-            resolve(list);
-          } else if (this.memoryCache.length > 0) {
-            resolve([...this.memoryCache]);
-          } else {
-            const defaults = this.generateDefaultSeeds();
-            this.memoryCache = defaults;
-            resolve(defaults);
-          }
+          const rawList: ElectronicComponent[] = req.result || [];
+          const sanitized = rawList.map((item) => ({
+            ...item,
+            package: normalizePackageFormat(item.package, item.footprint),
+            quantity: Math.max(0, parseInt(String(item.quantity ?? 0), 10) || 0),
+            minQuantity: Math.max(0, parseInt(String(item.minQuantity ?? 0), 10) || 0)
+          }));
+          resolve(sanitized);
         };
 
         req.onerror = () => {
-          resolve([...this.memoryCache]);
+          resolve([]);
         };
       } catch {
-        resolve([...this.memoryCache]);
+        resolve([]);
       }
     });
+  }
+
+  public async getAll(): Promise<ElectronicComponent[]> {
+    if (this.isFallbackMode || !this.db) {
+      return [...this.memoryCache];
+    }
+
+    try {
+      const items = await this.getAllFromStore();
+      this.memoryCache = items;
+      this.saveToLocalStorage(items);
+      return [...items];
+    } catch {
+      return [...this.memoryCache];
+    }
   }
 
   public async getById(id: string): Promise<ElectronicComponent | null> {
@@ -260,7 +302,6 @@ export class IndexedDbComponentRepository implements IComponentRepository {
   public async save(component: ElectronicComponent): Promise<void> {
     let finalId = component.id;
 
-    // Éviter les doublons par référence
     if (!finalId && component.ref) {
       const existing = await this.getByRef(component.ref);
       if (existing) {
@@ -272,10 +313,12 @@ export class IndexedDbComponentRepository implements IComponentRepository {
       ...component,
       id: finalId || crypto.randomUUID(),
       ref: component.ref.trim(),
+      package: normalizePackageFormat(component.package, component.footprint),
+      quantity: Math.max(0, parseInt(String(component.quantity ?? 0), 10) || 0),
+      minQuantity: Math.max(0, parseInt(String(component.minQuantity ?? 0), 10) || 0),
       updatedAt: Date.now()
     };
 
-    // 1. Mettre à jour le cache mémoire et localStorage
     const idx = this.memoryCache.findIndex(
       (c) => c.id === enriched.id || c.ref.trim().toLowerCase() === enriched.ref.toLowerCase()
     );
@@ -307,7 +350,6 @@ export class IndexedDbComponentRepository implements IComponentRepository {
   public async saveBatch(components: ElectronicComponent[], preventDuplicates = true): Promise<void> {
     if (components.length === 0) return;
 
-    // 1. Déduplication en mémoire
     const map = new Map<string, ElectronicComponent>();
     for (const item of this.memoryCache) {
       const key = preventDuplicates ? item.ref.trim().toLowerCase() : item.id;
@@ -369,21 +411,18 @@ export class IndexedDbComponentRepository implements IComponentRepository {
     });
   }
 
-  /**
-   * Réinitialisation totale : vide et réinsère les 20 références initiales uniques
-   */
   public async resetToDefault(): Promise<ElectronicComponent[]> {
-    // 1. Vidage total
     await this.clear();
 
-    // 2. Génération des 20 références d'usine certifiées
-    const defaults = this.generateDefaultSeeds();
+    let defaults: ElectronicComponent[];
+    if (this.db) {
+      defaults = await seedDatabase(this.db);
+    } else {
+      defaults = this.generateDefaultSeeds();
+    }
+
     this.memoryCache = defaults;
     this.saveToLocalStorage(defaults);
-
-    if (this.db) {
-      await this.putBatchToStore(defaults);
-    }
 
     localStorage.setItem(SEED_FLAG_KEY, 'true');
     return defaults;
@@ -410,7 +449,7 @@ export class IndexedDbComponentRepository implements IComponentRepository {
         pins: (item.pins || 'N/A').toString().trim(),
         footprint: (item.footprint || 'N/A').trim(),
         category: (item.category || 'Divers').trim(),
-        package: (item.package || 'CMS/SMD') as any,
+        package: normalizePackageFormat(item.package, item.footprint),
         functionDesc: (item.functionDesc || (item as any).function || '').trim(),
         description: (item.description || (item as any).desc || '').trim(),
         quantity: Math.max(0, parseInt(String(item.quantity ?? 1), 10) || 0),
@@ -432,13 +471,10 @@ export class IndexedDbComponentRepository implements IComponentRepository {
     return validated.length;
   }
 
-  /**
-   * Génère les 20 références uniques par défaut avec des IDs déterministes
-   */
   private generateDefaultSeeds(): ElectronicComponent[] {
     const now = Date.now();
-    return DEFAULT_COMPONENTS_SEEDS.map((seed) => {
-      const deterministicId = `seed-${seed.ref.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+    return STATIC_SEED_COMPONENTS.map((seed, idx) => {
+      const deterministicId = `seed-${idx + 1}-${seed.ref.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
       return {
         ...seed,
         id: deterministicId,
