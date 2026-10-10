@@ -14,11 +14,14 @@ import {
   MapPin, 
   Hash, 
   Loader2,
-  RefreshCw
+  RefreshCw,
+  QrCode,
+  Smartphone
 } from 'lucide-react';
 import { ElectronicComponent, PackageFormat, CATEGORIES_LIST } from '../../core/domain/types';
 import { AiService, ScannedComponentData } from '../../services/ai.service';
 import { processAndCompressImage } from '../../utils/image-processor';
+import { QrCodeGenerator } from '../../utils/qr-generator';
 
 interface ScannerModalProps {
   isOpen: boolean;
@@ -33,7 +36,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
   onClose,
   onSaveComponent
 }) => {
-  const [activeTab, setActiveTab] = useState<'CAMERA' | 'FILE'>('CAMERA');
+  const [activeTab, setActiveTab] = useState<'CAMERA' | 'FILE' | 'SMARTPHONE'>('CAMERA');
   const [step, setStep] = useState<ScanStep>('CAPTURE');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -251,9 +254,24 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
         {/* Corps de la modale */}
         <div className="p-5 space-y-4">
           {errorMessage && (
-            <div className="p-3 bg-rose-950/40 border border-rose-800/80 rounded-xl text-rose-300 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
-              <span>{errorMessage}</span>
+            <div className={`p-3 rounded-xl text-xs flex items-center gap-2 border ${
+              errorMessage.includes('429') || errorMessage.toLowerCase().includes('quota')
+                ? 'bg-amber-950/40 border-amber-600/80 text-amber-200'
+                : 'bg-rose-950/40 border-rose-800/80 text-rose-300'
+            }`}>
+              <AlertCircle className={`w-4 h-4 flex-shrink-0 ${
+                errorMessage.includes('429') || errorMessage.toLowerCase().includes('quota')
+                  ? 'text-amber-400'
+                  : 'text-rose-400'
+              }`} />
+              <div>
+                <span className="font-semibold block">{errorMessage}</span>
+                {(errorMessage.includes('429') || errorMessage.toLowerCase().includes('quota')) && (
+                  <span className="text-[11px] text-amber-300/80 mt-0.5 block">
+                    Astuce : Patientez 60 secondes pour réinitialiser le quota gratuit de requêtes par minute (RPM).
+                  </span>
+                )}
+              </div>
             </div>
           )}
 
@@ -261,21 +279,21 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
           {step === 'CAPTURE' && (
             <div className="space-y-4">
               {/* Sélecteur d'onglet Source */}
-              <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-700 max-w-sm mx-auto">
+              <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-700 max-w-lg mx-auto">
                 <button
                   type="button"
                   onClick={() => {
                     setActiveTab('CAMERA');
                     setTimeout(startCamera, 50);
                   }}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                  className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
                     activeTab === 'CAMERA'
                       ? 'bg-emerald-600 text-white shadow-sm'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   <Camera className="w-3.5 h-3.5" />
-                  <span>Appareil Photo / Webcam</span>
+                  <span>Webcam PC</span>
                 </button>
                 <button
                   type="button"
@@ -283,14 +301,30 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
                     stopCamera();
                     setActiveTab('FILE');
                   }}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                  className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
                     activeTab === 'FILE'
                       ? 'bg-emerald-600 text-white shadow-sm'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  <span>Importer un fichier</span>
+                  <span>Fichier Image</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    stopCamera();
+                    setActiveTab('SMARTPHONE');
+                  }}
+                  className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                    activeTab === 'SMARTPHONE'
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Connecter un smartphone par QR Code"
+                >
+                  <Smartphone className="w-3.5 h-3.5 text-amber-200" />
+                  <span>Smartphone (QR)</span>
                 </button>
               </div>
 
@@ -362,6 +396,32 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
                       className="hidden"
                     />
                   </label>
+                </div>
+              )}
+
+              {/* Vue Smartphone / QR Code direct */}
+              {activeTab === 'SMARTPHONE' && (
+                <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-6 flex flex-col items-center text-center space-y-4 aspect-video justify-center">
+                  <div className="p-3 bg-white rounded-xl shadow-lg border-2 border-slate-700 inline-block">
+                    <div
+                      className="w-36 h-36 flex items-center justify-center"
+                      dangerouslySetInnerHTML={{
+                        __html: QrCodeGenerator.generateSvg(
+                          typeof window !== 'undefined' ? `${window.location.origin}/capture` : '/capture',
+                          144,
+                          2
+                        )
+                      }}
+                    />
+                  </div>
+                  <div className="max-w-md space-y-1">
+                    <p className="text-xs font-bold text-amber-300">
+                      Connexion smartphone instantanée (/capture)
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      Flashez ce QR Code avec votre smartphone pour capturer et transmettre la photo directement à ce poste.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

@@ -1,10 +1,8 @@
 /**
  * @file AIModal.tsx
  * @description Conteneur d'orchestration de l'Assistant IA d'atelier d'électronique.
- * Intègre le double profil (Pédagogue / Chirurgical) et orchestre les sous-composants modulaires :
- * - AISuggestions : Puces de questions rapides adaptées au stock
- * - AIMessageList : Fil des échanges, rendu Markdown, aperçu d'image grand format & impression
- * - AIInputBar : Saisie de message, pièces jointes photo et capture vidéo/caméra
+ * Intègre la synthèse vocale native (TTS), la dictée vocale native (Micro),
+ * le statut d'Easter Egg masqué de Doc Brown, et la correction des assets d'icônes.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -16,7 +14,9 @@ import {
   BookOpen,
   Crosshair,
   Printer,
-  Zap
+  Zap,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { ElectronicComponent } from '../../core/domain/types';
 import { AiService, AiProfileMode } from '../../services/ai.service';
@@ -39,8 +39,29 @@ export const AIModal: React.FC<AIModalProps> = ({
 }) => {
   // Mode de profil (Pédagogue vs Chirurgical vs Doc Brown)
   const [activeMode, setActiveMode] = useState<AiProfileMode>('pedagogue');
-  const [appIcon, setAppIconState] = useState<string>('/assets/elec.ico');
+  const [appIcon, setAppIconState] = useState<string>('/assets/elec.svg');
   const [temporalNotification, setTemporalNotificationState] = useState<string | null>(null);
+
+  // Easter Egg : Doc Brown reste masqué par défaut tant qu'il n'est pas débloqué
+  const [isDocUnlocked, setIsDocUnlocked] = useState<boolean>(() => {
+    try {
+      return typeof window !== 'undefined' && localStorage.getItem('intellinventory_doc_unlocked') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Synthèse vocale native (TTS)
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [autoSpeak, setAutoSpeak] = useState<boolean>(false);
+
+  // Reconnaissance vocale native (Microphone)
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+
+  const isSpeechSupported = typeof window !== 'undefined' &&
+    Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
   const setActiveProfile = (profile: AiProfileMode) => {
     setActiveMode(profile);
@@ -48,12 +69,14 @@ export const AIModal: React.FC<AIModalProps> = ({
 
   const setAppIcon = (iconPath: string) => {
     setAppIconState(iconPath);
+    if (typeof document === 'undefined') return;
     let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
     if (!link) {
       link = document.createElement('link');
-      link.rel = 'shortcut icon';
+      link.rel = 'icon';
       document.getElementsByTagName('head')[0].appendChild(link);
     }
+    link.type = iconPath.endsWith('.svg') ? 'image/svg+xml' : 'image/x-icon';
     link.href = iconPath;
   };
 
@@ -70,8 +93,8 @@ export const AIModal: React.FC<AIModalProps> = ({
       sender: 'ai',
       text: `Bonjour ! Je suis votre assistant d'ingénierie électronique. J'ai accès en temps réel aux **${inventory.length} références** de votre stock d'atelier.
       
-Vous pouvez basculer entre le mode **Pédagogue** (compagnon de labo), le mode **Chirurgical** (power-user, sécurité 100nF) et le profil **Doc Brown** (inventeur excentrique & d'élite).
-Vous pouvez également joindre ou capturer une photo de composant pour une analyse multimodale directe.`,
+Vous pouvez basculer entre le mode **Pédagogue** (compagnon de labo) et le mode **Chirurgical** (power-user, sécurité 100nF)${isDocUnlocked ? ' ou le profil **Doc Brown** (inventeur d\'élite)' : ''}.
+Vous pouvez également joindre une photo de composant ou utiliser le micro pour une analyse directe.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       mode: 'pedagogue'
     }
@@ -90,6 +113,7 @@ Vous pouvez également joindre ou capturer une photo de composant pour une analy
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  // Gestion de la fermeture et du cycle de vie TTS / Audio
   useEffect(() => {
     if (isOpen) {
       document.body.classList.add('ai-modal-open');
@@ -97,16 +121,151 @@ Vous pouvez également joindre ou capturer une photo de composant pour une analy
     } else {
       document.body.classList.remove('ai-modal-open');
       document.body.classList.remove('ai-printing');
+      // Arrêt de toute synthèse vocale et écoute en cours
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch {}
+      }
+      setSpeakingMessageId(null);
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+      setIsListening(false);
     }
     return () => {
       document.body.classList.remove('ai-modal-open');
       document.body.classList.remove('ai-printing');
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch {}
+      }
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {}
+      }
     };
   }, [isOpen]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading, isProcessingImage]);
+
+  // Nettoyage Markdown pour prononciation TTS naturelle et agréable
+  const cleanTextForSpeech = (text: string): string => {
+    return text
+      .replace(/```[\s\S]*?```/g, ' [bloc de code omis] ')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/[*_#~>]/g, '')
+      .replace(/[-*+]\s+/g, '')
+      .replace(/\n+/g, '. ')
+      .trim();
+  };
+
+  // Déclencheur / Arrêt de la synthèse vocale native
+  const handleToggleSpeakMessage = (id: string, text: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      setErrorMsg("La synthèse vocale n'est pas prise en charge par ce navigateur.");
+      return;
+    }
+
+    if (speakingMessageId === id) {
+      window.speechSynthesis.cancel();
+      setSpeakingMessageId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const cleaned = cleanTextForSpeech(text);
+    const utterance = new SpeechSynthesisUtterance(cleaned);
+    utterance.lang = 'fr-FR';
+    utterance.rate = 1.05;
+
+    utterance.onend = () => {
+      setSpeakingMessageId(null);
+    };
+
+    utterance.onerror = (e) => {
+      console.warn('[TTS] Notification synthèse vocale :', e);
+      setSpeakingMessageId(null);
+    };
+
+    setSpeakingMessageId(id);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Déclencheur / Arrêt de la reconnaissance vocale native (Microphone)
+  const handleToggleVoice = () => {
+    if (!isSpeechSupported) {
+      setSpeechError("Reconnaissance vocale non prise en charge par ce navigateur.");
+      setTimeout(() => setSpeechError(null), 4000);
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'fr-FR';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setSpeechError(null);
+      };
+
+      recognition.onresult = (event: any) => {
+        if (event.results && event.results[0] && event.results[0][0]) {
+          const transcript = event.results[0][0].transcript.trim();
+          if (transcript) {
+            setInputPrompt((prev) => (prev ? `${prev} ${transcript}` : transcript));
+          }
+        }
+        setIsListening(false);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('[Microphone Assistant] Erreur :', event.error);
+        if (event.error !== 'no-speech') {
+          if (event.error === 'not-allowed') {
+            setSpeechError("Accès au microphone refusé par le navigateur.");
+          } else {
+            setSpeechError(`Erreur microphone : ${event.error}`);
+          }
+          setTimeout(() => setSpeechError(null), 4000);
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        recognitionRef.current = null;
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error('[Microphone Assistant] Erreur démarrage :', err);
+      setIsListening(false);
+      setSpeechError("Impossible d'accéder au microphone.");
+      setTimeout(() => setSpeechError(null), 4000);
+    }
+  };
 
   // Impression directe du protocole technique / historique
   const handlePrintProtocol = () => {
@@ -147,13 +306,18 @@ Vous pouvez également joindre ou capturer une photo de composant pour une analy
 
     if ((!prompt && !currentImage) || isLoading || isProcessingImage) return;
 
-    // Logique d'interception du déclencheur Easter Egg et bascule visuelle / comportementale
+    // Logique d'interception du déclencheur Easter Egg et déverrouillage de Doc Brown
     let effectiveMode = activeMode;
-    if (prompt.toLowerCase().includes("tonnerre de zeus")) {
+    const lowerPrompt = prompt.toLowerCase();
+    if (lowerPrompt.includes("tonnerre de zeus") || lowerPrompt.includes("nom de zeus")) {
       effectiveMode = "docbrown";
+      setIsDocUnlocked(true);
+      try {
+        localStorage.setItem('intellinventory_doc_unlocked', 'true');
+      } catch {}
       setActiveProfile("docbrown");
-      setAppIcon("/assets/elec.ico");
-      triggerTemporalNotification("Great Scott ! Flux temporel activé à 1,21 gigowatts.");
+      setAppIcon("/assets/elec.svg");
+      triggerTemporalNotification("Great Scott ! Flux temporel activé à 1,21 gigowatts. Profil Doc Brown débloqué !");
     }
 
     const actualPrompt = prompt || "Analyse cette image dans le contexte de mon atelier d'électronique et de mes composants.";
@@ -190,6 +354,11 @@ Vous pouvez également joindre ou capturer une photo de composant pour une analy
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages((prev) => [...prev, aiMessage]);
+
+      // Lecture vocale automatique si activée
+      if (autoSpeak && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        handleToggleSpeakMessage(aiMessage.id, reply);
+      }
     } catch (err: any) {
       setErrorMsg(err.message || 'Erreur lors de la communication avec le serveur IA.');
     } finally {
@@ -222,6 +391,10 @@ Vous pouvez également joindre ou capturer une photo de composant pour une analy
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages((prev) => [...prev, aiMessage]);
+
+      if (autoSpeak && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        handleToggleSpeakMessage(aiMessage.id, reply);
+      }
     } catch (err: any) {
       setErrorMsg(err.message || 'Erreur lors de la génération de projets.');
     } finally {
@@ -230,11 +403,15 @@ Vous pouvez également joindre ou capturer une photo de composant pour une analy
   };
 
   const clearHistory = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setSpeakingMessageId(null);
     setMessages([
       {
         id: crypto.randomUUID(),
         sender: 'ai',
-        text: `Historique réinitialisé. Profil actif : **${activeMode === 'docbrown' ? 'Doc Emmett Brown' : activeMode === 'chirurgical' ? 'Chirurgical' : 'Pédagogue'}**. Posez une question technique ou envoyez une photo.`,
+        text: `Historique réinitialisé. Profil actif : **${activeMode === 'docbrown' ? 'Doc Emmett Brown' : activeMode === 'chirurgical' ? 'Chirurgical' : 'Pédagogue'}**. Posez une question technique, envoyez une photo ou dictez au micro.`,
         mode: activeMode,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
@@ -277,13 +454,13 @@ Vous pouvez également joindre ou capturer une photo de composant pour une analy
               </h3>
               <p className="text-[11px] text-slate-400 flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                Backend sécurisé • Recherche Web • Inventaire ({inventory.length} réf.)
+                Backend sécurisé • Dictée vocale • Inventaire ({inventory.length} réf.)
               </p>
             </div>
           </div>
 
           <div className="flex items-center justify-between sm:justify-end gap-2">
-            {/* Sélecteur de profil System Instructions */}
+            {/* Sélecteur de profil System Instructions (Doc Brown masqué tant que non débloqué) */}
             <div 
               id="ai-mode-selector"
               className="bg-slate-950 p-1 rounded-xl border border-slate-700 flex items-center gap-1"
@@ -317,23 +494,42 @@ Vous pouvez également joindre ou capturer une photo de composant pour une analy
                 <span>Chirurgical</span>
               </button>
 
-              <button
-                type="button"
-                id="btn-mode-docbrown"
-                onClick={() => setActiveProfile('docbrown')}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
-                  activeMode === 'docbrown'
-                    ? 'bg-cyan-600 text-white shadow-sm font-bold ring-1 ring-yellow-400'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                }`}
-                title="Profil d'Élite Suprême : Doc Emmett Brown (Gemini 3.5 Flash Lite)"
-              >
-                <Zap className="w-3.5 h-3.5 text-yellow-300" />
-                <span>Doc Brown</span>
-              </button>
+              {/* Affichage conditionnel de Doc Brown comme véritable Easter Egg */}
+              {isDocUnlocked && (
+                <button
+                  type="button"
+                  id="btn-mode-docbrown"
+                  onClick={() => setActiveProfile('docbrown')}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all animate-in zoom-in-95 ${
+                    activeMode === 'docbrown'
+                      ? 'bg-cyan-600 text-white shadow-sm font-bold ring-1 ring-yellow-400'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  }`}
+                  title="Profil d'Élite Suprême : Doc Emmett Brown (Gemini 3.5 Flash Lite)"
+                >
+                  <Zap className="w-3.5 h-3.5 text-yellow-300" />
+                  <span>Doc Brown</span>
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-1 ai-no-print">
+              {/* Toggle de synthèse vocale automatique */}
+              <button
+                type="button"
+                id="btn-toggle-auto-speak"
+                onClick={() => setAutoSpeak(!autoSpeak)}
+                className={`p-1.5 rounded-lg text-xs flex items-center gap-1 transition ${
+                  autoSpeak 
+                    ? 'text-cyan-300 bg-cyan-950/70 border border-cyan-500/50' 
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+                title={autoSpeak ? "Désactiver la lecture vocale automatique" : "Activer la lecture vocale automatique des réponses (TTS)"}
+              >
+                {autoSpeak ? <Volume2 className="w-3.5 h-3.5 text-cyan-400 animate-pulse" /> : <VolumeX className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">{autoSpeak ? 'Voix ON' : 'Voix'}</span>
+              </button>
+
               <button
                 type="button"
                 id="btn-print-ai-chat"
@@ -411,7 +607,7 @@ Vous pouvez également joindre ou capturer une photo de composant pour une analy
           onGenerateProjects={handleGenerateProjects}
         />
 
-        {/* Sous-composant 2: Fil de messages, rendu Markdown, aperçu grand format & impression */}
+        {/* Sous-composant 2: Fil de messages, rendu Markdown, aperçu grand format, TTS & impression */}
         <AIMessageList
           messages={messages}
           activeMode={activeMode}
@@ -419,10 +615,12 @@ Vous pouvez également joindre ou capturer une photo de composant pour une analy
           isLoading={isLoading}
           isProcessingImage={isProcessingImage}
           errorMsg={errorMsg}
+          speakingMessageId={speakingMessageId}
+          onToggleSpeakMessage={handleToggleSpeakMessage}
           messagesEndRef={messagesEndRef}
         />
 
-        {/* Sous-composant 3: Barre de saisie & actions multimodales */}
+        {/* Sous-composant 3: Barre de saisie, dictée vocale native & actions multimodales */}
         <AIInputBar
           inputPrompt={inputPrompt}
           setInputPrompt={setInputPrompt}
@@ -431,11 +629,15 @@ Vous pouvez également joindre ou capturer une photo de composant pour une analy
           activeMode={activeMode}
           isLoading={isLoading}
           isProcessingImage={isProcessingImage}
+          isListening={isListening}
+          isSpeechSupported={isSpeechSupported}
+          speechError={speechError}
           inputRef={inputRef}
           fileInputRef={fileInputRef}
           cameraInputRef={cameraInputRef}
           onSendPrompt={() => handleSendPrompt()}
           onFileSelected={handleFileSelected}
+          onToggleVoice={handleToggleVoice}
         />
       </div>
     </div>

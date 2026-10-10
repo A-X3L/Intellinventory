@@ -295,16 +295,36 @@ ${inventorySummary}`;
     const reply = response.text || "Aucune réponse générée par le modèle.";
     res.json({ reply, mode });
   } catch (error: any) {
-    console.error('[API /api/ai/query] Erreur :', error);
-    const message = error?.message || 'Erreur lors du traitement de la requête IA.';
-    const isKeyMissing = message.includes('GEMINI_API_KEY');
-    res.status(isKeyMissing ? 503 : 500).json({
-      error: isKeyMissing
-        ? "La clé GEMINI_API_KEY n'est pas encore configurée dans les paramètres de l'application."
-        : message
-    });
+    handleGeminiError(res, '/api/ai/query', error);
   }
 });
+
+// Gestionnaire d'erreurs centralisé pour les quotas et pannes Gemini API
+function handleGeminiError(res: express.Response, context: string, error: any) {
+  console.error(`[API ${context}] Erreur :`, error);
+  const message = String(error?.message || error || 'Erreur lors du traitement de la requête IA.');
+  const isKeyMissing = message.includes('GEMINI_API_KEY');
+  const isQuotaExceeded =
+    message.includes('429') ||
+    message.includes('RESOURCE_EXHAUSTED') ||
+    message.toLowerCase().includes('quota') ||
+    message.toLowerCase().includes('rate limit');
+
+  if (isKeyMissing) {
+    return res.status(503).json({
+      error: "La clé GEMINI_API_KEY n'est pas encore configurée dans les paramètres de l'application."
+    });
+  }
+
+  if (isQuotaExceeded) {
+    return res.status(429).json({
+      error: "Quota de requêtes Google Gemini dépassé (429 RESOURCE_EXHAUSTED). Le plafond d'appels de l'API gratuite Gemini a été atteint. Veuillez patienter une minute avant de reformuler votre demande ou vérifier vos quotas sur Google AI Studio.",
+      isQuotaExceeded: true
+    });
+  }
+
+  return res.status(500).json({ error: message });
+}
 
 app.post('/api/ai/ideas', async (req, res) => {
   try {
@@ -341,8 +361,7 @@ Pour chaque projet, respecte strictement la structure suivante :
 
     res.json({ reply: response.text || 'Aucune idée générée.' });
   } catch (error: any) {
-    console.error('[API /api/ai/ideas] Erreur :', error);
-    res.status(500).json({ error: error?.message || "Erreur lors de la génération d'idées de projets." });
+    handleGeminiError(res, '/api/ai/ideas', error);
   }
 });
 
@@ -441,8 +460,7 @@ Tu DOIS impérativement répondre sous la forme d'un objet JSON strict valide sa
       }
     });
   } catch (error: any) {
-    console.error('[API /api/ai/scan-component] Erreur :', error);
-    res.status(500).json({ error: error?.message || "Erreur lors de l'analyse visuelle du composant." });
+    handleGeminiError(res, '/api/ai/scan-component', error);
   }
 });
 

@@ -21,7 +21,8 @@ import {
   ComponentModal, 
   ScannerModal, 
   AIModal, 
-  ExportImportModal 
+  ExportImportModal,
+  MobileTerminalModal 
 } from './components/modals';
 import { CaptureTerminal } from './components/CaptureTerminal';
 
@@ -81,6 +82,7 @@ export default function App() {
   const [isComponentModalOpen, setIsComponentModalOpen] = useState(false);
   const [componentToEdit, setComponentToEdit] = useState<ElectronicComponent | null>(null);
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
+  const [isMobileTerminalModalOpen, setIsMobileTerminalModalOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isExportImportModalOpen, setIsExportImportModalOpen] = useState(false);
 
@@ -322,6 +324,7 @@ export default function App() {
       <Header
         onOpenAddModal={handleOpenAddModal}
         onOpenScannerModal={() => setIsScannerModalOpen(true)}
+        onOpenMobileModal={() => setIsMobileTerminalModalOpen(true)}
         onOpenAiModal={() => setIsAiModalOpen(true)}
         onOpenExportImportModal={() => setIsExportImportModalOpen(true)}
         onResetData={handleResetFactoryData}
@@ -400,10 +403,10 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Notification Toast de capture synchrone depuis smartphone */}
+      {/* Notification Toast de capture synchrone depuis smartphone (Harmonisé avec la charte visuelle sombre) */}
       {latestRemoteCapture && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 border-2 border-emerald-500/80 text-white p-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 backdrop-blur-md">
-          <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/95 border border-slate-700/80 text-slate-100 p-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 backdrop-blur-md">
+          <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
             <span className="relative flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
@@ -419,7 +422,7 @@ export default function App() {
           </div>
           <button
             onClick={() => setIsScannerModalOpen(true)}
-            className="ml-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition shadow-md shadow-emerald-600/30 whitespace-nowrap"
+            className="ml-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition shadow-md shadow-emerald-600/20 whitespace-nowrap"
           >
             Ouvrir Scanner
           </button>
@@ -438,6 +441,11 @@ export default function App() {
         isOpen={isScannerModalOpen}
         onClose={() => setIsScannerModalOpen(false)}
         onSaveComponent={handleSaveComponent}
+      />
+
+      <MobileTerminalModal
+        isOpen={isMobileTerminalModalOpen}
+        onClose={() => setIsMobileTerminalModalOpen(false)}
       />
 
       <AIModal

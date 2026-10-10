@@ -84,14 +84,21 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       recognition.onerror = (event: any) => {
         console.warn('[Dictée vocale] Notification :', event.error);
         if (event.error !== 'no-speech') {
-          setSpeechError(`Erreur vocale : ${event.error}`);
-          setTimeout(() => setSpeechError(null), 3500);
+          if (event.error === 'not-allowed') {
+            setSpeechError("Accès au microphone refusé par le navigateur.");
+          } else if (event.error === 'network') {
+            setSpeechError("Erreur de connexion du service vocal.");
+          } else {
+            setSpeechError(`Erreur vocale : ${event.error}`);
+          }
+          setTimeout(() => setSpeechError(null), 4000);
         }
         setIsListening(false);
       };
 
       recognition.onend = () => {
         setIsListening(false);
+        recognitionRef.current = null;
       };
 
       recognitionRef.current = recognition;

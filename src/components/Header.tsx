@@ -10,13 +10,16 @@ import {
   Plus, 
   Download,
   Camera,
-  Printer
+  Printer,
+  QrCode,
+  Smartphone
 } from 'lucide-react';
 import { AiStatusResponse } from '../services/ai.service';
 
 interface HeaderProps {
   onOpenAddModal: () => void;
   onOpenScannerModal: () => void;
+  onOpenMobileModal: () => void;
   onOpenAiModal: () => void;
   onOpenExportImportModal: () => void;
   onResetData: () => void;
@@ -26,6 +29,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   onOpenAddModal,
   onOpenScannerModal,
+  onOpenMobileModal,
   onOpenAiModal,
   onOpenExportImportModal,
   aiStatus
@@ -67,18 +71,17 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Scanner un composant</span>
           </button>
 
-          {/* Bouton Terminal Mobile (/capture) */}
-          <a
+          {/* Bouton Terminal Mobile (/capture) - Ouvre la modale QR Code */}
+          <button
             id="btn-open-mobile-capture"
-            href="/capture"
-            target="_blank"
-            rel="noopener noreferrer"
+            type="button"
+            onClick={onOpenMobileModal}
             className="bg-amber-600 hover:bg-amber-500 active:scale-95 text-white px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 shadow-md shadow-amber-600/25 border border-amber-500/30"
-            title="Ouvrir le Terminal de Capture Distant pour Smartphone / Tablette"
+            title="Connexion smartphone / tablette par QR Code (sans nouvel onglet)"
           >
-            <Camera className="w-4 h-4 text-amber-200" />
-            <span>Terminal Mobile</span>
-          </a>
+            <QrCode className="w-4 h-4 text-amber-200" />
+            <span>Terminal Mobile (QR Code)</span>
+          </button>
 
           {/* Bouton Assistant IA avec indicateur */}
           <button

@@ -60,8 +60,11 @@ export const AiService = {
       body: JSON.stringify({ image: imageBase64 })
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      if (res.status === 429 || data.isQuotaExceeded) {
+        throw new Error(data.error || "Quota de requêtes Google Gemini dépassé (429). Le plafond d'appels gratuits de l'API a été atteint. Veuillez patienter un instant ou vérifier vos quotas sur Google AI Studio.");
+      }
       throw new Error(data.error || `Erreur d'analyse (code ${res.status})`);
     }
 
@@ -101,8 +104,11 @@ export const AiService = {
       body: JSON.stringify(payload)
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      if (res.status === 429 || data.isQuotaExceeded) {
+        throw new Error(data.error || "Quota de requêtes Google Gemini dépassé (429). Le plafond d'appels de l'API a été atteint. Veuillez patienter une minute avant de reformuler votre demande ou vérifier vos quotas sur Google AI Studio.");
+      }
       throw new Error(data.error || `Erreur serveur (code ${res.status})`);
     }
 
@@ -119,8 +125,11 @@ export const AiService = {
       body: JSON.stringify({ inventory })
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      if (res.status === 429 || data.isQuotaExceeded) {
+        throw new Error(data.error || "Quota de requêtes Google Gemini dépassé (429). Le plafond d'appels de l'API a été atteint. Veuillez patienter une minute avant de réessayer.");
+      }
       throw new Error(data.error || `Erreur serveur (code ${res.status})`);
     }
 

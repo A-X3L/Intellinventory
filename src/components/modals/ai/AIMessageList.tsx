@@ -1,7 +1,7 @@
 /**
  * @file AIMessageList.tsx
  * @description Encapsule le fil des messages de la conversation IA, le formatage Markdown,
- * les statuts de traitement image/IA, la modale d'agrandissement d'image et le bloc d'impression.
+ * la synthèse vocale (TTS) native, les statuts de traitement image/IA et la modale d'agrandissement.
  */
 
 import React, { useState, RefObject } from 'react';
@@ -13,7 +13,9 @@ import {
   Image as ImageIcon, 
   Maximize2, 
   X,
-  Zap
+  Zap,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { AiProfileMode } from '../../../services/ai.service';
 import { SecuritySanitizer } from '../../../infrastructure/security/sanitizer';
@@ -34,6 +36,8 @@ interface AIMessageListProps {
   isLoading: boolean;
   isProcessingImage: boolean;
   errorMsg: string | null;
+  speakingMessageId: string | null;
+  onToggleSpeakMessage: (id: string, text: string) => void;
   messagesEndRef: RefObject<HTMLDivElement | null>;
 }
 
@@ -44,6 +48,8 @@ export const AIMessageList: React.FC<AIMessageListProps> = ({
   isLoading,
   isProcessingImage,
   errorMsg,
+  speakingMessageId,
+  onToggleSpeakMessage,
   messagesEndRef,
 }) => {
   const [previewEnlargedImage, setPreviewEnlargedImage] = useState<string | null>(null);
@@ -57,7 +63,7 @@ export const AIMessageList: React.FC<AIMessageListProps> = ({
   return (
     <>
       <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-grow text-xs sm:text-sm ai-chat-thread">
-        {/* En-tête imprimé dédié au protocole d'atelier (visible uniquement à l'impression - Point 4) */}
+        {/* En-tête imprimé dédié au protocole d'atelier */}
         <div className="hidden print:block mb-4 pb-3 border-b-2 border-black text-black">
           <div className="flex justify-between items-start">
             <div>
@@ -117,7 +123,39 @@ export const AIMessageList: React.FC<AIMessageListProps> = ({
                     </span>
                   )}
                 </div>
-                <span>{msg.timestamp}</span>
+
+                <div className="flex items-center gap-2">
+                  {/* Bouton Synthèse Vocale (TTS) native pour les messages IA */}
+                  {msg.sender === 'ai' && (
+                    <button
+                      type="button"
+                      onClick={() => onToggleSpeakMessage(msg.id, msg.text)}
+                      className={`p-1 rounded hover:bg-slate-800 transition flex items-center gap-1 print:hidden ${
+                        speakingMessageId === msg.id
+                          ? 'text-cyan-300 bg-cyan-950/60 ring-1 ring-cyan-500/50 animate-pulse'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                      title={
+                        speakingMessageId === msg.id
+                          ? "Arrêter la synthèse vocale"
+                          : "Écouter ce message à voix haute (Synthèse vocale native)"
+                      }
+                    >
+                      {speakingMessageId === msg.id ? (
+                        <>
+                          <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+                          <span className="text-[9px] font-medium text-rose-300">Stop</span>
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-3.5 h-3.5" />
+                          <span className="text-[9px] font-medium hidden sm:inline">Écouter</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                  <span>{msg.timestamp}</span>
+                </div>
               </div>
 
               {/* Vignette d'image jointe par l'utilisateur */}
@@ -201,10 +239,26 @@ export const AIMessageList: React.FC<AIMessageListProps> = ({
           </div>
         )}
 
+        {/* Message d'erreur enrichi avec prise en charge explicite des quotas */}
         {errorMsg && (
-          <div className="p-3.5 bg-rose-950/40 border border-rose-800/80 rounded-xl text-rose-300 text-xs flex items-center gap-2 ai-no-print">
-            <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
-            <span>{errorMsg}</span>
+          <div className={`p-3.5 rounded-xl text-xs flex items-center gap-2.5 ai-no-print border ${
+            errorMsg.includes('429') || errorMsg.toLowerCase().includes('quota')
+              ? 'bg-amber-950/50 border-amber-600/70 text-amber-200'
+              : 'bg-rose-950/40 border-rose-800/80 text-rose-300'
+          }`}>
+            <AlertCircle className={`w-4 h-4 flex-shrink-0 ${
+              errorMsg.includes('429') || errorMsg.toLowerCase().includes('quota')
+                ? 'text-amber-400'
+                : 'text-rose-400'
+            }`} />
+            <div>
+              <span className="font-semibold block">{errorMsg}</span>
+              {(errorMsg.includes('429') || errorMsg.toLowerCase().includes('quota')) && (
+                <span className="text-[11px] text-amber-300/80 mt-1 block">
+                  Le quota gratuit Google AI Studio pour Gemini Flash Lite est plafonné à 15 requêtes/minute. Veuillez patienter une minute avant de reformuler votre demande.
+                </span>
+              )}
+            </div>
           </div>
         )}
 

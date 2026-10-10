@@ -1,10 +1,10 @@
 /**
  * @file AIInputBar.tsx
- * @description Barre de saisie textuelle et d'actions multimodales (image / caméra) pour l'Assistant IA.
+ * @description Barre de saisie textuelle, dictée vocale native et capture photo pour l'Assistant IA.
  */
 
 import React, { RefObject } from 'react';
-import { Send, Camera, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Send, Camera, Trash2, Mic, MicOff, Radio } from 'lucide-react';
 import { AiProfileMode } from '../../../services/ai.service';
 import { ProcessedImage } from '../../../utils/image-processor';
 
@@ -16,11 +16,15 @@ interface AIInputBarProps {
   activeMode: AiProfileMode;
   isLoading: boolean;
   isProcessingImage: boolean;
+  isListening: boolean;
+  isSpeechSupported: boolean;
+  speechError: string | null;
   inputRef: RefObject<HTMLInputElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   cameraInputRef: RefObject<HTMLInputElement | null>;
   onSendPrompt: () => void;
   onFileSelected: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onToggleVoice: () => void;
 }
 
 export const AIInputBar: React.FC<AIInputBarProps> = ({
@@ -31,11 +35,15 @@ export const AIInputBar: React.FC<AIInputBarProps> = ({
   activeMode,
   isLoading,
   isProcessingImage,
+  isListening,
+  isSpeechSupported,
+  speechError,
   inputRef,
   fileInputRef,
   cameraInputRef,
   onSendPrompt,
   onFileSelected,
+  onToggleVoice,
 }) => {
   return (
     <>
@@ -80,17 +88,24 @@ export const AIInputBar: React.FC<AIInputBarProps> = ({
 
       {/* Barre de saisie & actions multimodales */}
       <div className="bg-slate-900/95 px-4 py-3 border-t border-slate-700 flex flex-col gap-2 flex-shrink-0 ai-no-print">
+        {/* Indicateur de dictée vocale en cours */}
+        {isListening && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-rose-950/40 border border-rose-800/60 rounded-xl text-xs text-rose-300 animate-pulse">
+            <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping flex-shrink-0" />
+            <span className="font-medium">Microphone actif : Parlez distinctement pour dicter votre question à l'assistant...</span>
+          </div>
+        )}
+
+        {speechError && (
+          <div className="flex items-center gap-2 px-3 py-1 bg-amber-950/40 border border-amber-800/60 rounded-xl text-xs text-amber-300">
+            <span>{speechError}</span>
+          </div>
+        )}
+
         <div className="flex items-center gap-2">
-          {/* Inputs cachés pour Photo / Caméra */}
+          {/* Input fichier caché pour Photo / Schéma */}
           <input
             ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={onFileSelected}
-            className="hidden"
-          />
-          <input
-            ref={cameraInputRef}
             type="file"
             accept="image/*"
             capture="environment"
@@ -98,28 +113,46 @@ export const AIInputBar: React.FC<AIInputBarProps> = ({
             className="hidden"
           />
 
-          {/* Bouton Import Fichier Photo */}
+          {/* Bouton Unique Photo / Schéma (Fusion ergonomique des boutons redondants) */}
           <button
             type="button"
             id="btn-chat-upload-image"
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading || isProcessingImage}
             className="p-2 bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-40 text-slate-300 hover:text-white rounded-xl border border-slate-700 flex items-center justify-center transition"
-            title="Joindre une photo ou un schéma (redimensionnement automatique max 1024px)"
+            title="Joindre ou prendre une photo de composant / schéma (max 1024px)"
           >
-            <ImageIcon className="w-4 h-4" />
+            <Camera className="w-4 h-4 text-emerald-400" />
           </button>
 
-          {/* Bouton Capture Caméra Directe */}
+          {/* Bouton Microphone Dictée Vocale Native */}
           <button
             type="button"
-            id="btn-chat-capture-camera"
-            onClick={() => cameraInputRef.current?.click()}
-            disabled={isLoading || isProcessingImage}
-            className="p-2 bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-40 text-slate-300 hover:text-white rounded-xl border border-slate-700 flex items-center justify-center transition"
-            title="Prendre une photo avec la caméra du laboratoire"
+            id="btn-chat-voice-dictation"
+            onClick={onToggleVoice}
+            disabled={isLoading || isProcessingImage || !isSpeechSupported}
+            className={`p-2 rounded-xl border flex items-center justify-center transition-all ${
+              isListening
+                ? 'bg-rose-600 text-white animate-pulse border-rose-500 shadow-md shadow-rose-600/30'
+                : isSpeechSupported
+                ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-rose-400 border-slate-700'
+                : 'bg-slate-800/50 text-slate-600 border-slate-800 cursor-not-allowed opacity-50'
+            }`}
+            title={
+              !isSpeechSupported
+                ? 'Dictée vocale non prise en charge par ce navigateur'
+                : isListening
+                ? 'Écoute vocale en cours... Cliquez pour stopper'
+                : 'Dicter vocalement la question (Web Speech API locale)'
+            }
           >
-            <Camera className="w-4 h-4" />
+            {isListening ? (
+              <Radio className="w-4 h-4 animate-spin text-white" />
+            ) : isSpeechSupported ? (
+              <Mic className="w-4 h-4" />
+            ) : (
+              <MicOff className="w-4 h-4" />
+            )}
           </button>
 
           {/* Champ texte */}
@@ -134,6 +167,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = ({
             placeholder={
               attachedImage 
                 ? "Ajoutez une question sur cette image ou appuyez sur Entrée pour l'analyser..."
+                : isListening
+                ? "Écoute en cours... parlez dans votre micro..."
                 : activeMode === 'docbrown'
                   ? "Saisissez votre question ou 'tonnerre de zeus' pour l'assistant temporel..."
                   : activeMode === 'chirurgical'
