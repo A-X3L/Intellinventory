@@ -7,6 +7,7 @@
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
+import os from 'os';
 import { GoogleGenAI } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 
@@ -66,6 +67,24 @@ function getGeminiClient(): GoogleGenAI {
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Détection des adresses IPv4 locales pour le QR Code mobile
+app.get('/api/network/info', (_req, res) => {
+  const interfaces = os.networkInterfaces();
+  const localIps: string[] = [];
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name] || []) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        localIps.push(iface.address);
+      }
+    }
+  }
+  res.json({
+    primaryIp: localIps[0] || '127.0.0.1',
+    allIps: localIps,
+    port: PORT
+  });
 });
 
 // ----------------------------------------------------

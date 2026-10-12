@@ -18,7 +18,7 @@ import { AiStatusResponse } from '../services/ai.service';
 
 interface HeaderProps {
   onOpenAddModal: () => void;
-  onOpenScannerModal: () => void;
+  onOpenScannerModal?: () => void;
   onOpenMobileModal: () => void;
   onOpenAiModal: () => void;
   onOpenExportImportModal: () => void;
@@ -28,7 +28,6 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenAddModal,
-  onOpenScannerModal,
   onOpenMobileModal,
   onOpenAiModal,
   onOpenExportImportModal,
@@ -36,15 +35,15 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   return (
     <header className="bg-slate-800/95 backdrop-blur border-b border-slate-700 shadow-md sticky top-0 z-30 print:hidden">
-      <div className="max-w-7xl mx-auto px-4 py-3.5 sm:px-6 lg:px-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6 lg:px-8 flex items-center justify-between gap-4 overflow-x-auto whitespace-nowrap">
         {/* Titre & Logo */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 flex-shrink-0">
           <div className="p-2.5 bg-emerald-600 rounded-xl shadow-lg shadow-emerald-600/20 text-white flex items-center justify-center">
             <Cpu className="w-6 h-6" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+              <h1 className="text-base sm:text-lg font-bold text-white tracking-tight">
                 Inventaire Composants Électroniques
               </h1>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
@@ -52,23 +51,23 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Gestion d'atelier, localisation en casiers &amp; scanner IA par photo
+              Gestion d'atelier, localisation en casiers &amp; assistant technique
             </p>
           </div>
         </div>
 
-        {/* Boutons d'actions */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Bouton Scanner par Photo */}
+        {/* Boutons d'actions - Alignés sur une seule ligne */}
+        <div className="flex items-center gap-2 flex-nowrap flex-shrink-0">
+          {/* Bouton Ajouter Manuellement (Couleur vert pomme) */}
           <button
-            id="btn-open-scanner"
+            id="btn-open-add"
             type="button"
-            onClick={onOpenScannerModal}
-            className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 shadow-md shadow-emerald-600/25"
-            title="Identifier un composant avec l'appareil photo ou une image"
+            onClick={onOpenAddModal}
+            className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 shadow-md shadow-emerald-600/25"
+            title="Ajouter un nouveau composant à l'atelier"
           >
-            <Camera className="w-4 h-4" />
-            <span>Scanner un composant</span>
+            <Plus className="w-4 h-4" />
+            <span>Ajouter</span>
           </button>
 
           {/* Bouton Terminal Mobile (/capture) - Ouvre la modale QR Code */}
@@ -80,7 +79,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Connexion smartphone / tablette par QR Code (sans nouvel onglet)"
           >
             <QrCode className="w-4 h-4 text-amber-200" />
-            <span>Terminal Mobile (QR Code)</span>
+            <span>Terminal Mobile</span>
           </button>
 
           {/* Bouton Assistant IA avec indicateur */}
@@ -95,17 +94,6 @@ export const Header: React.FC<HeaderProps> = ({
             {aiStatus?.configured && (
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Serveur Gemini Opérationnel" />
             )}
-          </button>
-
-          {/* Bouton Ajouter Manuellement */}
-          <button
-            id="btn-open-add"
-            type="button"
-            onClick={onOpenAddModal}
-            className="bg-slate-700 hover:bg-slate-600 active:scale-95 text-slate-200 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all flex items-center gap-1.5 border border-slate-600"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Ajouter</span>
           </button>
 
           {/* Bouton Import / Export */}

@@ -8,3 +8,4 @@ export { ScannerModal } from './ScannerModal';
 export { AIModal } from './AIModal';
 export { ExportImportModal } from './ExportImportModal';
 export { MobileTerminalModal } from './MobileTerminalModal';
+export { ResetModal } from './ResetModal';

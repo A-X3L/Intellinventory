@@ -609,33 +609,18 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
                 </div>
               </div>
 
-              {/* Ligne 5 : Quantité & Seuil */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1 flex items-center gap-1">
-                    <Hash className="w-3.5 h-3.5 text-slate-400" /> Quantité initiale
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.quantity ?? 1}
-                    onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value, 10) || 0 })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-slate-100 font-mono text-xs focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">
-                    Seuil d'alerte stock
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.minQuantity ?? 2}
-                    onChange={(e) => setFormData({ ...formData, minQuantity: parseInt(e.target.value, 10) || 0 })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-slate-100 font-mono text-xs focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
+              {/* Ligne 5 : Quantité initiale */}
+              <div>
+                <label className="block font-semibold text-slate-300 mb-1 flex items-center gap-1">
+                  <Hash className="w-3.5 h-3.5 text-slate-400" /> Quantité initiale
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.quantity ?? 1}
+                  onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value, 10) || 0, minQuantity: 0 })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-slate-100 font-mono text-xs focus:outline-none focus:border-emerald-500"
+                />
               </div>
 
               {/* Ligne 6 : Fonction principale */}

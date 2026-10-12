@@ -64,7 +64,35 @@ export const AIModal: React.FC<AIModalProps> = ({
     Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
   const setActiveProfile = (profile: AiProfileMode) => {
+    if (profile === activeMode) return;
     setActiveMode(profile);
+
+    const modeNotices: Record<AiProfileMode, { title: string; text: string }> = {
+      pedagogue: {
+        title: "Mode Pédagogue Activé",
+        text: "Basculement en **Mode Pédagogue** : Conseils didactiques, vulgarisation technique pas-à-pas, explication détaillée des circuits et dimensionnement adapté aux débutants et makers."
+      },
+      chirurgical: {
+        title: "Mode Chirurgical Activé",
+        text: "Basculement en **Mode Chirurgical** : Réponses ultra-concises, directes aux broches. **Règle absolue de sécurité :** Découplage 100nF systématique au plus court des broches VCC/GND, valeurs normalisées E12/E24 et limitations thermiques sans détour."
+      },
+      docbrown: {
+        title: "Profil Doc Emmett Brown Activé",
+        text: "Nom de Zeus ! Basculement sur l'inventeur d'élite. Condensateur de flux alimenté à 1,21 Gigowatts. Préparez-vous à défier l'espace-temps !"
+      }
+    };
+
+    const notice = modeNotices[profile];
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        sender: 'ai',
+        text: `⚡ **${notice.title}**\n\n${notice.text}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        mode: profile
+      }
+    ]);
   };
 
   const setAppIcon = (iconPath: string) => {
@@ -447,14 +475,24 @@ Vous pouvez également joindre une photo de composant ou utiliser le micro pour 
                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border font-mono ${
                   activeMode === 'docbrown'
                     ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 font-bold animate-pulse'
-                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    : activeMode === 'chirurgical'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 font-bold'
+                      : 'bg-purple-500/20 text-purple-300 border-purple-500/30 font-bold'
                 }`}>
-                  {activeMode === 'docbrown' ? 'Gemini 3.5 Flash Lite (Élite)' : 'Gemini Flash Lite'}
+                  {activeMode === 'docbrown'
+                    ? 'Doc Brown (Élite)'
+                    : activeMode === 'chirurgical'
+                      ? 'Mode Chirurgical'
+                      : 'Mode Pédagogue'}
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                Backend sécurisé • Dictée vocale • Inventaire ({inventory.length} réf.)
+                {activeMode === 'chirurgical'
+                  ? `Sécurité 100nF • Nomenclature stricte • Inventaire (${inventory.length} réf.)`
+                  : activeMode === 'docbrown'
+                    ? `Flux temporel 1.21 GW • Inventaire (${inventory.length} réf.)`
+                    : `Didactique d'atelier • Inventaire (${inventory.length} réf.)`}
               </p>
             </div>
           </div>

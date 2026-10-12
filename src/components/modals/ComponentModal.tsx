@@ -259,33 +259,18 @@ export const ComponentModal: React.FC<ComponentModalProps> = ({
             </div>
           </div>
 
-          {/* Ligne 5 : Quantité en Stock & Seuil d'Alerte */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block font-semibold text-slate-300 mb-1 flex items-center gap-1">
-                <Hash className="w-3.5 h-3.5 text-slate-400" /> Quantité en stock
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.quantity ?? 0}
-                onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value, 10) || 0 })}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-300 mb-1">
-                Seuil d'alerte réapprovisionnement
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.minQuantity ?? 0}
-                onChange={(e) => setFormData({ ...formData, minQuantity: parseInt(e.target.value, 10) || 0 })}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
-              />
-            </div>
+          {/* Ligne 5 : Quantité en Stock */}
+          <div>
+            <label className="block font-semibold text-slate-300 mb-1 flex items-center gap-1">
+              <Hash className="w-3.5 h-3.5 text-slate-400" /> Quantité en stock
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={formData.quantity ?? 0}
+              onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value, 10) || 0, minQuantity: 0 })}
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
+            />
           </div>
 
           {/* Ligne 6 : Lien Datasheet */}

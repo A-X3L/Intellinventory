@@ -374,7 +374,7 @@ export class QrCodeGenerator {
   /**
    * Génère le QR Code sous forme d'une chaîne SVG optimisée et responsive
    */
-  public static generateSvg(text: string, sizePx = 256, margin = 3): string {
+  public static generateSvg(text: string, sizePx = 256, margin = 4): string {
     const matrix = this.generateMatrix(text);
     const modulesCount = matrix.length;
     const totalSize = modulesCount + margin * 2;
@@ -389,8 +389,8 @@ export class QrCodeGenerator {
     }
 
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalSize} ${totalSize}" width="${sizePx}" height="${sizePx}" shape-rendering="crispEdges">
-  <rect width="${totalSize}" height="${totalSize}" fill="#ffffff" rx="2"/>
-  <path d="${paths.trim()}" fill="#0f172a"/>
+  <rect width="${totalSize}" height="${totalSize}" fill="#ffffff"/>
+  <path d="${paths.trim()}" fill="#000000"/>
 </svg>`;
   }
 }

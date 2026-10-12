@@ -15,7 +15,6 @@ import {
   MapPin, 
   Plus, 
   Minus, 
-  AlertTriangle,
   PackageOpen,
   Cpu,
   Recycle
@@ -140,7 +139,6 @@ export const ComponentTable: React.FC<ComponentTableProps> = ({
 
           <tbody className="divide-y divide-slate-700/50">
             {components.map((item, index) => {
-              const isLowStock = item.quantity <= item.minQuantity;
               const isRecycled = item.source === 'Récupération';
               const displayPackage = normalizePackageFormat(item.package, item.footprint);
 
@@ -246,17 +244,9 @@ export const ComponentTable: React.FC<ComponentTableProps> = ({
                       </button>
 
                       <div className="min-w-[36px] text-center">
-                        <span className={`font-mono font-bold text-xs sm:text-sm ${
-                          isLowStock ? 'text-rose-400' : 'text-slate-100'
-                        }`}>
+                        <span className="font-mono font-bold text-xs sm:text-sm text-slate-100">
                           {item.quantity}
                         </span>
-                        {isLowStock && (
-                          <div className="flex items-center justify-center text-[9px] text-rose-400/90 font-semibold gap-0.5" title={`Stock critique (min: ${item.minQuantity})`}>
-                            <AlertTriangle className="w-2.5 h-2.5" />
-                            <span>min:{item.minQuantity}</span>
-                          </div>
-                        )}
                       </div>
 
                       <button

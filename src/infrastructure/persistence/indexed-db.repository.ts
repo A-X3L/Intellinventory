@@ -3,7 +3,7 @@
  * @description Adaptateur de persistance IndexedDB asynchrone robuste avec fallback mémoire/localStorage et seeding statique strict
  */
 
-import { ElectronicComponent, normalizePackageFormat, DEFAULT_COMPONENTS_SEEDS } from '../../core/domain/types';
+import { ElectronicComponent, normalizePackageFormat, normalizeCategory, DEFAULT_COMPONENTS_SEEDS } from '../../core/domain/types';
 import { IComponentRepository } from '../../core/ports/repository.port';
 
 const DB_NAME = 'ElecInventoryDB_v2';
@@ -80,7 +80,7 @@ export class IndexedDbComponentRepository implements IComponentRepository {
 
     const hasSeeded = typeof window !== 'undefined' && localStorage.getItem(SEED_FLAG_KEY) === 'true';
     const cachedLocal = this.getFromLocalStorage();
-    if (hasSeeded && cachedLocal.length >= STATIC_SEED_COMPONENTS.length) {
+    if (hasSeeded) {
       this.memoryCache = cachedLocal;
     }
 
@@ -95,19 +95,16 @@ export class IndexedDbComponentRepository implements IComponentRepository {
       this.db = await this.openDatabaseWithTimeout(1500);
       const dbItems = await this.getAllFromStore();
 
-      if (!hasSeeded || dbItems.length < STATIC_SEED_COMPONENTS.length) {
+      if (!hasSeeded) {
+        // Premier démarrage uniquement : initialisation avec la bibliothèque d'usine
         const defaults = await seedDatabase(this.db);
         this.memoryCache = defaults;
         this.saveToLocalStorage(defaults);
         localStorage.setItem(SEED_FLAG_KEY, 'true');
-      } else if (dbItems.length > 0) {
+      } else {
+        // Respect strict de la base existante (y compris après réinitialisation / vidage par l'utilisateur)
         this.memoryCache = dbItems;
         this.saveToLocalStorage(dbItems);
-      } else {
-        const defaults = await seedDatabase(this.db);
-        this.memoryCache = defaults;
-        this.saveToLocalStorage(defaults);
-        localStorage.setItem(SEED_FLAG_KEY, 'true');
       }
     } catch (err) {
       console.warn('[IndexedDB] Ouverture impossible ou expirée, bascule en mode mémoire/localStorage :', err);
@@ -122,7 +119,7 @@ export class IndexedDbComponentRepository implements IComponentRepository {
     const hasSeeded = typeof window !== 'undefined' && localStorage.getItem(SEED_FLAG_KEY) === 'true';
     const cachedLocal = this.getFromLocalStorage();
 
-    if (hasSeeded && cachedLocal.length >= STATIC_SEED_COMPONENTS.length) {
+    if (hasSeeded) {
       this.memoryCache = cachedLocal;
       return;
     }
@@ -263,9 +260,10 @@ export class IndexedDbComponentRepository implements IComponentRepository {
           const rawList: ElectronicComponent[] = req.result || [];
           const sanitized = rawList.map((item) => ({
             ...item,
+            category: normalizeCategory(item.category, item.family, item.type, item.ref),
             package: normalizePackageFormat(item.package, item.footprint),
             quantity: Math.max(0, parseInt(String(item.quantity ?? 0), 10) || 0),
-            minQuantity: Math.max(0, parseInt(String(item.minQuantity ?? 0), 10) || 0)
+            minQuantity: 0
           }));
           resolve(sanitized);
         };
@@ -313,9 +311,10 @@ export class IndexedDbComponentRepository implements IComponentRepository {
       ...component,
       id: finalId || crypto.randomUUID(),
       ref: component.ref.trim(),
+      category: normalizeCategory(component.category, component.family, component.type, component.ref),
       package: normalizePackageFormat(component.package, component.footprint),
       quantity: Math.max(0, parseInt(String(component.quantity ?? 0), 10) || 0),
-      minQuantity: Math.max(0, parseInt(String(component.minQuantity ?? 0), 10) || 0),
+      minQuantity: 0,
       updatedAt: Date.now()
     };
 
@@ -411,7 +410,16 @@ export class IndexedDbComponentRepository implements IComponentRepository {
     });
   }
 
-  public async resetToDefault(): Promise<ElectronicComponent[]> {
+  public async clearAll(): Promise<void> {
+    await this.clear();
+    this.memoryCache = [];
+    this.saveToLocalStorage([]);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(SEED_FLAG_KEY, 'true');
+    }
+  }
+
+  public async restoreSeedBackup(): Promise<ElectronicComponent[]> {
     await this.clear();
 
     let defaults: ElectronicComponent[];
@@ -424,8 +432,14 @@ export class IndexedDbComponentRepository implements IComponentRepository {
     this.memoryCache = defaults;
     this.saveToLocalStorage(defaults);
 
-    localStorage.setItem(SEED_FLAG_KEY, 'true');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(SEED_FLAG_KEY, 'true');
+    }
     return defaults;
+  }
+
+  public async resetToDefault(): Promise<ElectronicComponent[]> {
+    return this.restoreSeedBackup();
   }
 
   public async exportAll(): Promise<ElectronicComponent[]> {
@@ -448,12 +462,12 @@ export class IndexedDbComponentRepository implements IComponentRepository {
         type: (item.type || '').trim(),
         pins: (item.pins || 'N/A').toString().trim(),
         footprint: (item.footprint || 'N/A').trim(),
-        category: (item.category || 'Divers').trim(),
+        category: normalizeCategory(item.category || 'Divers', item.family, item.type, item.ref),
         package: normalizePackageFormat(item.package, item.footprint),
         functionDesc: (item.functionDesc || (item as any).function || '').trim(),
         description: (item.description || (item as any).desc || '').trim(),
         quantity: Math.max(0, parseInt(String(item.quantity ?? 1), 10) || 0),
-        minQuantity: Math.max(0, parseInt(String(item.minQuantity ?? 1), 10) || 0),
+        minQuantity: 0,
         location: (item.location || 'Atelier').trim(),
         datasheetUrl: item.datasheetUrl,
         imageUrl: item.imageUrl,

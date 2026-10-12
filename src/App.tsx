@@ -22,7 +22,8 @@ import {
   ScannerModal, 
   AIModal, 
   ExportImportModal,
-  MobileTerminalModal 
+  MobileTerminalModal,
+  ResetModal 
 } from './components/modals';
 import { CaptureTerminal } from './components/CaptureTerminal';
 
@@ -85,6 +86,7 @@ export default function App() {
   const [isMobileTerminalModalOpen, setIsMobileTerminalModalOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isExportImportModalOpen, setIsExportImportModalOpen] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
   // Initialisation du stockage IndexedDB et du statut de l'IA
   useEffect(() => {
@@ -140,18 +142,12 @@ export default function App() {
     let dipRefsCount = 0;
     let moduleCount = 0;
     let moduleRefsCount = 0;
-    let lowStockCount = 0;
 
     for (const c of components) {
       const rawQty = (c as any).stock ?? c.quantity ?? 0;
       const qty = typeof rawQty === 'number'
         ? (Number.isFinite(rawQty) ? Math.max(0, Math.floor(rawQty)) : 0)
         : (parseInt(String(rawQty || 0), 10) || 0);
-
-      const rawMinQty = (c as any).minStock ?? c.minQuantity ?? 0;
-      const minQty = typeof rawMinQty === 'number'
-        ? (Number.isFinite(rawMinQty) ? Math.max(0, Math.floor(rawMinQty)) : 0)
-        : (parseInt(String(rawMinQty || 0), 10) || 0);
 
       totalQuantity += qty;
 
@@ -167,10 +163,6 @@ export default function App() {
         moduleCount += qty;
         moduleRefsCount++;
       }
-
-      if (qty <= minQty) {
-        lowStockCount++;
-      }
     }
 
     return {
@@ -183,7 +175,7 @@ export default function App() {
       moduleCount,
       moduleRefsCount,
       categoriesCount: availableCategories.length,
-      lowStockCount
+      lowStockCount: 0
     };
   }, [components, availableCategories]);
 
@@ -208,9 +200,8 @@ export default function App() {
 
         const matchCat = filter.category === 'ALL' || item.category === filter.category;
         const matchPkg = filter.packageType === 'ALL' || normalizePackageFormat(item.package, item.footprint) === filter.packageType;
-        const matchLow = !filter.lowStockOnly || (item.quantity <= item.minQuantity);
 
-        return matchSearch && matchCat && matchPkg && matchLow;
+        return matchSearch && matchCat && matchPkg;
       })
       .sort((a, b) => {
         let valA: any = a[filter.sortBy] ?? '';
@@ -296,19 +287,25 @@ export default function App() {
     setComponents((prev) => prev.map((c) => (c.id === id ? updated : c)));
   };
 
-  const handleResetFactoryData = async () => {
-    const confirmed = window.confirm(
-      "Attention : Voulez-vous réinitialiser l'inventaire avec la bibliothèque d'usine d'atelier ? Vos ajouts personnalisés seront remplacés."
-    );
-    if (confirmed) {
-      setIsLoading(true);
-      try {
-        const resetList = await componentRepository.resetToDefault();
-        setComponents(resetList);
-        setFilter((prev) => ({ ...prev, search: '', category: 'ALL', packageType: 'ALL', lowStockOnly: false }));
-      } finally {
-        setIsLoading(false);
-      }
+  const handleClearAll = async () => {
+    setIsLoading(true);
+    try {
+      await componentRepository.clearAll();
+      setComponents([]);
+      setFilter((prev) => ({ ...prev, search: '', category: 'ALL', packageType: 'ALL', lowStockOnly: false }));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRestoreBackup = async () => {
+    setIsLoading(true);
+    try {
+      const resetList = await componentRepository.restoreSeedBackup();
+      setComponents(resetList);
+      setFilter((prev) => ({ ...prev, search: '', category: 'ALL', packageType: 'ALL', lowStockOnly: false }));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -323,11 +320,10 @@ export default function App() {
       {/* En-tête */}
       <Header
         onOpenAddModal={handleOpenAddModal}
-        onOpenScannerModal={() => setIsScannerModalOpen(true)}
         onOpenMobileModal={() => setIsMobileTerminalModalOpen(true)}
         onOpenAiModal={() => setIsAiModalOpen(true)}
         onOpenExportImportModal={() => setIsExportImportModalOpen(true)}
-        onResetData={handleResetFactoryData}
+        onResetData={() => setIsResetModalOpen(true)}
         aiStatus={aiStatus}
       />
 
@@ -349,13 +345,12 @@ export default function App() {
               <p className="font-bold mt-0.5">{filteredComponents.length} référence(s) répertoriée(s)</p>
             </div>
           </div>
-          {(filter.search || filter.category !== 'ALL' || filter.packageType !== 'ALL' || filter.lowStockOnly) && (
+          {(filter.search || filter.category !== 'ALL' || filter.packageType !== 'ALL') && (
             <div className="mt-2 text-xs bg-gray-100 p-2 border border-gray-300 font-mono">
               <span className="font-semibold">Filtres appliqués : </span>
               {filter.search && <span>Recherche : &laquo; {filter.search} &raquo; • </span>}
               {filter.category !== 'ALL' && <span>Catégorie : {filter.category} • </span>}
-              {filter.packageType !== 'ALL' && <span>Format : {filter.packageType} • </span>}
-              {filter.lowStockOnly && <span className="font-bold text-rose-700">Alertes Stock Faible • </span>}
+              {filter.packageType !== 'ALL' && <span>Format : {filter.packageType}</span>}
             </div>
           )}
         </div>
@@ -371,7 +366,7 @@ export default function App() {
           categories={availableCategories}
           onFilterChange={(newFields) => setFilter((prev) => ({ ...prev, ...newFields }))}
           onResetFilter={() => setFilter((prev) => ({ ...prev, search: '', category: 'ALL', packageType: 'ALL', lowStockOnly: false }))}
-          onResetFactoryData={handleResetFactoryData}
+          onResetFactoryData={() => setIsResetModalOpen(true)}
           totalFiltered={filteredComponents.length}
         />
 
@@ -459,6 +454,13 @@ export default function App() {
         onClose={() => setIsExportImportModalOpen(false)}
         inventory={components}
         onImport={handleImportBatch}
+      />
+
+      <ResetModal
+        isOpen={isResetModalOpen}
+        onClose={() => setIsResetModalOpen(false)}
+        onClearAll={handleClearAll}
+        onRestoreBackup={handleRestoreBackup}
       />
     </div>
   );

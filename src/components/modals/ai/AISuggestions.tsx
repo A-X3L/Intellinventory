@@ -108,10 +108,10 @@ export const AISuggestions: React.FC<AISuggestionsProps> = ({
         type="button"
         onClick={onGenerateProjects}
         disabled={isLoading}
-        className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 whitespace-nowrap transition-colors disabled:opacity-50"
+        className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 whitespace-nowrap transition-colors disabled:opacity-50 flex-shrink-0"
         title="Générer 3 projets adaptés au stock d'atelier"
       >
-        <Lightbulb className="w-3 h-3 text-amber-400" />
+        <Lightbulb className="w-3 h-3 text-amber-400 flex-shrink-0" />
         <span>3 Projets avec mon stock</span>
       </button>
 
@@ -121,7 +121,7 @@ export const AISuggestions: React.FC<AISuggestionsProps> = ({
           type="button"
           onClick={() => onSelectPrompt(sug.prompt)}
           disabled={isLoading}
-          className="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 whitespace-nowrap transition-colors flex items-center gap-1.5 hover:border-slate-500"
+          className="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 whitespace-nowrap transition-colors flex items-center gap-1.5 hover:border-slate-500 flex-shrink-0"
           title={sug.prompt}
         >
           <span>{sug.label}</span>
@@ -132,10 +132,10 @@ export const AISuggestions: React.FC<AISuggestionsProps> = ({
         type="button"
         onClick={() => setSuggestionSeed(prev => prev + 1)}
         disabled={isLoading}
-        className="px-2 py-1 rounded-full bg-slate-800/70 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700/70 text-[10px] whitespace-nowrap transition-colors flex items-center gap-1 ml-auto"
+        className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[10px] whitespace-nowrap transition-colors flex items-center gap-1 flex-shrink-0"
         title="Faire tourner les suggestions selon d'autres références de l'inventaire"
       >
-        <Sparkles className="w-3 h-3 text-amber-400" />
+        <Sparkles className="w-3 h-3 text-amber-400 flex-shrink-0" />
         <span>Autres suggestions</span>
       </button>
     </div>

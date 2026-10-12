@@ -9,9 +9,7 @@ import {
   Boxes, 
   Layers, 
   Cpu, 
-  Tags, 
-  AlertTriangle,
-  CheckCircle2
+  Tags 
 } from 'lucide-react';
 import { StockMetrics } from '../core/domain/types';
 
@@ -20,11 +18,9 @@ interface StatsCardsProps {
 }
 
 export const StatsCards: React.FC<StatsCardsProps> = ({ metrics }) => {
-  const hasLowStock = metrics.lowStockCount > 0;
-
   return (
-    <div className="space-y-3.5 mb-6">
-      {/* 1. Grille des 4 compteurs purement informatifs et non cliquables */}
+    <div className="mb-6">
+      {/* Grille des 4 compteurs purement informatifs */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Stock Total & Références */}
         <div className="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 shadow-sm flex items-center justify-between select-none">
@@ -89,40 +85,6 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ metrics }) => {
           <div className="p-2.5 bg-purple-500/10 text-purple-400 rounded-xl border border-purple-500/20">
             <Tags className="w-5 h-5" />
           </div>
-        </div>
-      </div>
-
-      {/* 2. Indicateur d'alerte épuré (jaune / amber) */}
-      <div 
-        className={`rounded-xl px-4 py-2 border flex items-center justify-between select-none transition-colors ${
-          hasLowStock 
-            ? 'bg-amber-950/30 border-amber-700/60 text-amber-300' 
-            : 'bg-slate-800/50 border-slate-700/50 text-slate-400'
-        }`}
-      >
-        <div className="flex items-center gap-2">
-          {hasLowStock ? (
-            <div className="p-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-          ) : (
-            <div className="p-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          )}
-          <div className="text-xs">
-            {hasLowStock ? (
-              <span>
-                <span className="font-mono font-bold text-amber-200">{metrics.lowStockCount}</span> référence(s) sous le seuil d'approvisionnement
-              </span>
-            ) : (
-              <span>Stock nominal : aucun composant sous le seuil</span>
-            )}
-          </div>
-        </div>
-
-        <div className="text-[11px] opacity-80 font-mono">
-          {hasLowStock ? 'Réapprovisionnement requis' : 'Atelier opérationnel'}
         </div>
       </div>
     </div>

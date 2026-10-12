@@ -8,10 +8,9 @@ import {
   Search, 
   X, 
   RotateCcw, 
-  AlertCircle,
-  Mic,
-  MicOff,
-  Radio
+  Mic, 
+  MicOff, 
+  Radio 
 } from 'lucide-react';
 import { InventoryFilter } from '../core/domain/types';
 
@@ -126,8 +125,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   const hasActiveFilters = Boolean(
     filter.search.trim() ||
     filter.category !== 'ALL' ||
-    filter.packageType !== 'ALL' ||
-    filter.lowStockOnly
+    filter.packageType !== 'ALL'
   );
 
   return (
@@ -237,21 +235,6 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             </select>
           </div>
 
-          {/* Bouton Toggle Stock Faible */}
-          <button
-            type="button"
-            id="filter-low-stock-btn"
-            onClick={() => onFilterChange({ lowStockOnly: !filter.lowStockOnly })}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border ${
-              filter.lowStockOnly
-                ? 'bg-rose-500/20 text-rose-300 border-rose-500'
-                : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
-            }`}
-          >
-            <AlertCircle className="w-3.5 h-3.5" />
-            <span>Stock Faible</span>
-          </button>
-
           {/* Effacer les filtres */}
           {hasActiveFilters && (
             <button
@@ -265,7 +248,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         </div>
       </div>
 
-      {/* Résumé des résultats et bouton réinitialiser les données d'usine */}
+      {/* Résumé des résultats et bouton réinitialiser les données */}
       <div className="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-700/50">
         <div>
           <span>{totalFiltered} référence(s) trouvée(s)</span>
@@ -276,10 +259,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           type="button"
           onClick={onResetFactoryData}
           className="text-rose-400/80 hover:text-rose-300 hover:underline flex items-center gap-1 transition-colors"
-          title="Réinitialise l'inventaire avec la base de données standard de composants"
+          title="Gérer ou réinitialiser l'inventaire de l'atelier"
         >
           <RotateCcw className="w-3 h-3" />
-          <span>Réinitialiser bibliothèque d'usine</span>
+          <span>Réinitialiser l'inventaire</span>
         </button>
       </div>
     </div>

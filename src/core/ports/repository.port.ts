@@ -47,12 +47,22 @@ export interface IComponentRepository {
   clear(): Promise<void>;
 
   /**
+   * Efface toutes les données sans réinjecter les données d'usine.
+   */
+  clearAll(): Promise<void>;
+
+  /**
+   * Restaure le backup technique de secours (59 composants CSV d'origine).
+   */
+  restoreSeedBackup(): Promise<ElectronicComponent[]>;
+
+  /**
    * Recherche un composant par sa référence sérigraphiée.
    */
   getByRef(ref: string): Promise<ElectronicComponent | null>;
 
   /**
-   * Réinitialise le stock avec les données d'usine.
+   * Réinitialise le stock avec les données d'usine (alias de restoreSeedBackup).
    */
   resetToDefault(): Promise<ElectronicComponent[]>;
 
